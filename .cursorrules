@@ -15,102 +15,202 @@
 
 ## ⚠️ 代码生成前必读（Critical）
 
-**在生成任何 Page Object 或 Test Case 代码之前，必须先读取以下文件：**
+**在生成任何 Page Object 或 Test Case 代码之前，必须执行以下步骤：**
 
 ```
 必读文件（按顺序）：
-1. generators/test_plan_generator.py  → 测试计划模板
-2. generators/test_code_generator.py  → 代码模板（怎么写）
-3. utils/logger.py                    → Logger 使用方式
+1. config/project.yaml               → 项目配置（仓库/服务/数据）
+2. generators/test_code_generator.py → 代码模板（怎么写）
+3. utils/logger.py                   → Logger 使用方式
 ```
 
-### 关键实现细节
+## ⭐ 页面功能分析流程（核心）
+
+当用户说"测试 xxx 页面"时，**必须先分析页面功能点**：
+
+### Step 1: 读取项目配置
 
 ```python
-# ❌ 错误：在模块级别创建 logger
-from utils.logger import TestLogger
-logger = TestLogger("test_xxx")  # 所有测试共享同一个名称
-
-# ✅ 正确：在每个测试方法内部创建 logger，使用测试方法名
-from utils.logger import TestLogger
-
-def test_p0_page_load(self):
-    logger = TestLogger("test_p0_page_load")  # 每个方法用自己的名称
-    logger.start()
-    logger.checkpoint("xxx", True)
-    logger.end(success=True)
-
-# ✅ @allure.title() 只显示测试方法名，不加 TC-XX-XXX
-@allure.title("test_p0_page_load")  # ✅ 简洁
-@allure.title("TC-CP-001: xxx")     # ❌ 冗余
+# 读取 config/project.yaml 获取仓库信息
+repositories:
+  frontend:
+    url: "https://github.com/owner/frontend"
+  backend:
+    url: "https://github.com/owner/backend"
 ```
 
-### 检查清单
+### Step 2: 根据页面 URL 推断代码位置
 
-生成代码前确认：
-- [ ] 已读取 `generators/test_code_generator.py`
-- [ ] 已读取 `utils/logger.py` 了解 `TestLogger` 用法
-- [ ] 已查看 `pages/` 目录现有 Page Object 风格
-- [ ] 测试方法命名使用 `test_p{0,1,2}_xxx` 格式
-- [ ] **TestLogger 在每个测试方法内部创建，使用测试方法名**
-- [ ] **@allure.title() 只写测试方法名（如 `test_p0_page_load`）**
-- [ ] 测试方法包含 `logger.start()` / `logger.checkpoint()` / `logger.end()`
+| 页面 URL | 可能的前端代码位置 |
+|----------|-------------------|
+| `/login` | `src/pages/login/`, `src/views/Login.tsx` |
+| `/admin/profile` | `src/pages/admin/profile/`, `src/views/Profile/` |
+| `/admin/profile/change-password` | `src/pages/admin/profile/ChangePassword.tsx` |
+| `/orders` | `src/pages/orders/`, `src/views/Orders/` |
+| `/products/:id` | `src/pages/products/[id].tsx`, `src/views/ProductDetail/` |
+
+**常见前端项目结构：**
+- React: `src/pages/`, `src/views/`, `src/components/`
+- Vue: `src/views/`, `src/pages/`, `src/components/`
+- Next.js: `pages/`, `app/`
+
+### Step 3: 使用 DeepWiki MCP 查询代码
+
+```
+# 使用 mcp_deepwiki-sse_ask_question 工具查询
+
+问题示例：
+1. "这个项目的目录结构是什么？"
+2. "找到 /admin/profile 页面对应的代码文件"
+3. "ProfilePage 组件有哪些功能和状态？"
+4. "修改密码功能的表单验证规则是什么？"
+5. "这个页面调用了哪些 API 接口？"
+```
+
+### Step 4: 分析功能点
+
+从代码中提取：
+
+| 分析维度 | 关注点 |
+|----------|--------|
+| **表单字段** | 输入框、下拉框、复选框、必填/可选 |
+| **验证规则** | 正则、长度限制、格式要求 |
+| **API 接口** | 请求方法、参数、响应 |
+| **状态管理** | 加载状态、错误状态、成功状态 |
+| **用户交互** | 按钮、链接、弹窗、提示 |
+| **业务逻辑** | 条件判断、流程分支 |
+
+### Step 5: 生成测试用例
+
+基于分析结果生成覆盖以下场景的测试：
+
+| 优先级 | 测试类型 | 来源 |
+|--------|----------|------|
+| P0 | 核心功能测试 | 主要业务流程 |
+| P0 | 必填字段验证 | 表单验证规则 |
+| P1 | 边界值测试 | 长度限制、数值范围 |
+| P1 | 格式验证测试 | 正则表达式规则 |
+| P1 | API 错误处理 | 接口异常场景 |
+| P2 | UI 状态测试 | 加载、禁用、高亮 |
+
+### 示例：分析修改密码页面
+
+```
+用户: 帮我测试修改密码页面
+
+AI 执行流程:
+┌─────────────────────────────────────────────────────────────────┐
+│ 1. 读取 config/project.yaml                                     │
+│    → 获取 frontend 仓库: https://github.com/owner/frontend      │
+├─────────────────────────────────────────────────────────────────┤
+│ 2. 推断代码位置                                                  │
+│    → URL: /admin/profile/change-password                        │
+│    → 可能位置: src/pages/admin/profile/ChangePassword.tsx       │
+├─────────────────────────────────────────────────────────────────┤
+│ 3. DeepWiki 查询                                                │
+│    Q1: "ChangePassword 组件的代码在哪里？"                       │
+│    Q2: "修改密码表单有哪些字段和验证规则？"                        │
+│    Q3: "修改密码调用的 API 接口是什么？"                          │
+├─────────────────────────────────────────────────────────────────┤
+│ 4. 分析功能点                                                   │
+│    表单字段:                                                    │
+│    - currentPassword (必填, 当前密码)                           │
+│    - newPassword (必填, 8-20字符, 含大小写+数字)                 │
+│    - confirmPassword (必填, 需与新密码一致)                      │
+│                                                                 │
+│    验证规则:                                                    │
+│    - 新密码长度 8-20                                            │
+│    - 必须包含大写、小写、数字                                    │
+│    - 新密码不能与当前密码相同                                    │
+│    - 确认密码必须匹配                                           │
+│                                                                 │
+│    API 接口:                                                    │
+│    - POST /api/user/change-password                             │
+│    - 参数: { currentPassword, newPassword }                     │
+├─────────────────────────────────────────────────────────────────┤
+│ 5. 生成测试用例                                                 │
+│    P0: test_p0_page_load - 页面加载                             │
+│    P0: test_p0_change_password_success - 正常修改密码            │
+│    P0: test_p0_wrong_current_password - 当前密码错误             │
+│    P1: test_p1_password_too_short - 密码太短                    │
+│    P1: test_p1_password_mismatch - 确认密码不匹配                │
+│    P1: test_p1_same_as_current - 新密码与当前相同                │
+│    P2: test_p2_password_visibility - 密码显示/隐藏              │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ## 核心架构
 
 ```
 playwright-test-scaffold/
-├── core/           # 核心框架
+├── config/
+│   └── project.yaml      # 项目配置中心（仓库/服务/数据）
+├── core/
 │   ├── base_page.py      # 页面对象基类
 │   ├── page_utils.py     # 页面工具类
 │   └── fixtures.py       # pytest fixtures
-├── generators/     # 代码生成器
+├── generators/
 │   ├── page_analyzer.py      # 页面分析器
 │   └── test_code_generator.py # 测试代码生成
+├── utils/
+│   ├── config.py             # 配置管理器
+│   ├── logger.py             # 日志系统
+│   └── service_checker.py    # 服务健康检查
 ├── pages/          # Page Objects
 ├── tests/          # Test Cases
-├── test-data/      # 测试数据
-└── config/         # 配置文件
+└── test-data/      # 测试数据
 ```
 
 ## AI 对话指令处理
 
-当用户说以下类型的指令时，按照规范生成代码：
+### 测试页面（完整流程）
+```
+"帮我测试 xxx 页面"
+"测试 /admin/profile/change-password"
+```
+→ 执行「页面功能分析流程」→ 生成测试代码
 
-### 生成测试
+### 检查服务
 ```
-"帮我生成 xxx 页面的测试"
-"测试 https://xxx.com/page 页面"
-"为 xxx 功能创建测试用例"
+"检查服务状态"
+"服务是否启动"
 ```
-→ 生成 Page Object + Test Cases，包含完整的 Allure 集成
+→ 调用 ServiceChecker 检查
 
 ### 运行测试
 ```
 "运行测试"
-"执行测试，使用 4 个 worker"
-"只运行 P0 测试"
-"用 headed 模式运行"
+"执行 P0 测试"
 ```
-→ 构建 pytest 命令并执行
+→ 先检查服务 → 构建 pytest 命令
 
 ### 查看报告
 ```
 "打开 Allure 报告"
-"查看测试报告"
 ```
 → 执行 allure serve allure-results
 
-### 修复问题
+## 关键实现细节
+
+```python
+# ❌ 错误：在模块级别创建 logger
+logger = TestLogger("test_xxx")
+
+# ✅ 正确：在每个测试方法内部创建 logger
+def test_p0_page_load(self):
+    logger = TestLogger("test_p0_page_load")
+    logger.start()
+    logger.checkpoint("xxx", True)
+    logger.end(success=True)
+
+# ✅ @allure.title() 只写测试方法名
+@allure.title("test_p0_page_load")  # ✅
+@allure.title("TC-CP-001: xxx")     # ❌
 ```
-"测试失败了，帮我修复"
-"这个错误怎么解决"
-```
-→ 分析错误原因，修复代码
 
 ## 生成规范
 
-### 1. Page Object 规范
+### Page Object 规范
 
 ```python
 from core.base_page import BasePage
@@ -120,136 +220,69 @@ logger = get_logger(__name__)
 
 
 class XxxPage(BasePage):
-    """页面对象类"""
-    
     # ═══════════════════════════════════════════════════════════════
-    # SELECTORS
+    # SELECTORS - 根据 DeepWiki 分析的代码生成
     # ═══════════════════════════════════════════════════════════════
     
-    ELEMENT_NAME = "selector"  # 元素描述
+    CURRENT_PASSWORD_INPUT = "#currentPassword"
+    NEW_PASSWORD_INPUT = "#newPassword"
+    CONFIRM_PASSWORD_INPUT = "#confirmPassword"
+    SUBMIT_BUTTON = "button[type='submit']"
     
-    URL = "/path"
-    page_loaded_indicator = "selector"
-    
-    # ═══════════════════════════════════════════════════════════════
-    # NAVIGATION
-    # ═══════════════════════════════════════════════════════════════
+    URL = "/admin/profile/change-password"
+    page_loaded_indicator = "#currentPassword"
     
     def navigate(self) -> None:
-        """导航到页面"""
-        logger.info(f"导航到 Xxx 页面")
+        logger.info("导航到修改密码页面")
         self.goto(self.URL)
         self.wait_for_page_load()
     
     def is_loaded(self) -> bool:
-        """检查页面是否加载完成"""
         return self.is_visible(self.page_loaded_indicator, timeout=5000)
     
     # ═══════════════════════════════════════════════════════════════
-    # ACTIONS
+    # ACTIONS - 根据功能点生成
     # ═══════════════════════════════════════════════════════════════
     
-    def fill_xxx(self, value: str) -> None:
-        """填写 xxx 字段"""
-        logger.info(f"填写 xxx: {value}")
-        self.fill(self.XXX_INPUT, value)
+    def change_password(self, current: str, new: str, confirm: str) -> None:
+        """修改密码"""
+        self.fill(self.CURRENT_PASSWORD_INPUT, current)
+        self.fill(self.NEW_PASSWORD_INPUT, new)
+        self.fill(self.CONFIRM_PASSWORD_INPUT, confirm)
+        self.click(self.SUBMIT_BUTTON)
 ```
 
-### 2. Test Case 规范
+### Test Case 规范
 
 ```python
-import pytest
-import allure
-from pages.xxx_page import XxxPage
-from utils.logger import TestLogger
-
-
-def attach_expected(expectations: list[str]) -> None:
-    """附加预期目标到 Allure 报告"""
-    content = "\n".join(f"✓ {exp}" for exp in expectations)
-    allure.attach(content, name="预期目标", attachment_type=allure.attachment_type.TEXT)
-
-
-@allure.feature("功能模块")
-class TestXxx:
-    """测试类"""
-    
-    @pytest.fixture(autouse=True)
-    def setup(self, page):
-        self.page = page
-        self.xxx_page = XxxPage(page)
+@allure.feature("修改密码")
+class TestChangePassword:
     
     @pytest.mark.P0
-    @pytest.mark.functional
-    @allure.story("用户故事")
-    @allure.title("test_p0_xxx")  # ⚠️ 只写测试方法名
+    @allure.story("密码修改")
+    @allure.title("test_p0_change_password_success")
     @allure.description("""
-    **测试目的**: 验证什么功能
+    **测试目的**: 验证使用正确的当前密码和符合规则的新密码可以成功修改
     
-    **前置条件**:
-    - 条件1
+    **前置条件**: 用户已登录
     
-    **测试步骤**:
-    1. 步骤描述
+    **验证规则** (来自代码分析):
+    - 新密码 8-20 字符
+    - 必须包含大写、小写、数字
     """)
-    def test_p0_xxx(self):
-        """测试描述"""
-        logger = TestLogger("test_p0_xxx")  # ⚠️ 每个方法内部创建
+    def test_p0_change_password_success(self):
+        logger = TestLogger("test_p0_change_password_success")
         logger.start()
-        
-        attach_expected(["预期结果1", "预期结果2"])
-        
-        with allure.step("Step 1: 步骤描述"):
-            self.xxx_page.take_screenshot("tc_xx_001_before")
-            # 执行操作
-            logger.checkpoint("检查点描述", True)
-        
-        with allure.step("Step N: 验证结果"):
-            assert condition, "断言失败信息"
-            self.xxx_page.take_screenshot("tc_xx_001_result")
-        
-        logger.end(success=True)
+        # ...
 ```
 
-### 3. 测试优先级
+## 测试优先级
 
 | 标记 | 含义 | 场景 |
 |------|------|------|
 | P0 | 核心功能 | 主流程、关键路径 |
 | P1 | 重要功能 | 输入验证、边界值 |
 | P2 | 一般功能 | UI样式、可访问性 |
-
-### 4. 测试类型标记
-
-```python
-@pytest.mark.functional   # 功能测试
-@pytest.mark.validation   # 验证测试
-@pytest.mark.exception    # 异常测试
-@pytest.mark.ui           # UI测试
-```
-
-## 测试数据
-
-测试账号位于 `test-data/test_account_pool.json`
-
-```python
-def test_xxx(self, test_account):
-    """使用 test_account fixture 获取测试账号"""
-    username = test_account["username"]
-    password = test_account["password"]
-```
-
-## Allure 报告必备元素
-
-生成测试代码时**必须**包含：
-
-1. `@allure.feature()` - 功能模块
-2. `@allure.story()` - 用户故事
-3. `@allure.title()` - **只写测试方法名**
-4. `@allure.description()` - 测试描述
-5. `attach_expected()` - 预期目标
-6. `with allure.step()` - 步骤追踪
-7. `take_screenshot()` - 关键步骤截图
 
 ## 代码风格
 

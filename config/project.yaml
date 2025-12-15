@@ -1,7 +1,7 @@
 # ═══════════════════════════════════════════════════════════════
 # Playwright Test Scaffold - Project Configuration
 # ═══════════════════════════════════════════════════════════════
-# 用户配置文件：根据项目需求修改此文件
+# AI 驱动的自动化测试脚手架 - 项目配置中心
 
 # ─────────────────────────────────────────────────────────────────
 # 项目基本信息
@@ -12,52 +12,86 @@ project:
   version: "1.0.0"
 
 # ─────────────────────────────────────────────────────────────────
-# 环境配置
+# GitHub 仓库配置（AI 可通过此了解项目结构）
+# ─────────────────────────────────────────────────────────────────
+repositories:
+  frontend:
+    url: ""                              # 如: https://github.com/owner/frontend
+    branch: "main"
+    description: "前端项目"
+  backend:
+    url: ""                              # 如: https://github.com/owner/backend
+    branch: "main"
+    description: "后端 API 服务"
+
+# ─────────────────────────────────────────────────────────────────
+# 多环境服务地址配置
 # ─────────────────────────────────────────────────────────────────
 environments:
-  # 默认环境
   default: "dev"
   
-  # 开发环境
   dev:
-    base_url: "https://localhost:3000"
-    api_url: "https://localhost:44320"
-    description: "Development Environment"
+    frontend:
+      url: "https://localhost:3000"
+      health_check: "/"                  # 健康检查路径
+    backend:
+      url: "https://localhost:44320"
+      health_check: "/api/health"
   
-  # 测试环境
   staging:
-    base_url: "https://staging.example.com"
-    api_url: "https://staging-api.example.com"
-    description: "Staging Environment"
+    frontend:
+      url: "https://staging.example.com"
+      health_check: "/"
+    backend:
+      url: "https://staging-api.example.com"
+      health_check: "/api/health"
   
-  # 生产环境
   production:
-    base_url: "https://www.example.com"
-    api_url: "https://api.example.com"
-    description: "Production Environment"
+    frontend:
+      url: "https://www.example.com"
+      health_check: "/"
+    backend:
+      url: "https://api.example.com"
+      health_check: "/api/health"
+
+# ─────────────────────────────────────────────────────────────────
+# 测试数据配置（支持多种类型）
+# ─────────────────────────────────────────────────────────────────
+test_data:
+  # 测试账号池
+  accounts:
+    path: "test-data/test_account_pool.json"
+    description: "测试账号池"
+  
+  # 可扩展：添加其他测试数据类型
+  # orders:
+  #   path: "test-data/orders.json"
+  #   description: "订单测试数据"
+  #
+  # products:
+  #   path: "test-data/products.json"
+  #   description: "商品测试数据"
+
+# ─────────────────────────────────────────────────────────────────
+# 服务健康检查配置
+# ─────────────────────────────────────────────────────────────────
+health_check:
+  enabled: true                          # 是否启用服务检查
+  timeout: 10                            # 超时时间（秒）
+  retry_count: 3                         # 重试次数
+  retry_interval: 2                      # 重试间隔（秒）
 
 # ─────────────────────────────────────────────────────────────────
 # 浏览器配置
 # ─────────────────────────────────────────────────────────────────
 browser:
-  # 无头模式（true=不显示浏览器窗口，适合CI/CD）
-  headless: true
-  
-  # 操作延迟（毫秒，调试时设置较大值）
-  slow_mo: 0
-  
-  # 默认超时（毫秒）
-  timeout: 30000
-  
-  # 视口大小
+  headless: true                         # 无头模式
+  slow_mo: 0                             # 操作延迟（毫秒）
+  timeout: 30000                         # 默认超时（毫秒）
   viewport:
     width: 1920
     height: 1080
-  
-  # 浏览器类型（chromium, firefox, webkit）
-  type: "chromium"
-  
-  # 浏览器启动参数
+  type: "chromium"                       # chromium, firefox, webkit
   args:
     - "--disable-web-security"
     - "--ignore-certificate-errors"
@@ -66,76 +100,20 @@ browser:
     - "--no-sandbox"
 
 # ─────────────────────────────────────────────────────────────────
-# 测试配置
+# 测试执行配置
 # ─────────────────────────────────────────────────────────────────
 test:
-  # 失败重试次数
-  retry_count: 2
-  
-  # 隐式等待时间（秒）
-  implicit_wait: 10
-  
-  # 失败时截图
-  screenshot_on_failure: true
-  
-  # 视频录制
-  video_recording: false
-  
-  # 并行执行worker数量（auto=自动检测CPU核心数）
-  parallel_workers: "auto"
+  retry_count: 2                         # 失败重试次数
+  implicit_wait: 10                      # 隐式等待时间（秒）
+  screenshot_on_failure: true            # 失败时截图
+  video_recording: false                 # 视频录制
+  parallel_workers: "auto"               # 并行 worker 数量
 
 # ─────────────────────────────────────────────────────────────────
 # 报告配置
 # ─────────────────────────────────────────────────────────────────
 reports:
-  # Allure报告
   allure:
     enabled: true
     results_dir: "allure-results"
     report_dir: "allure-report"
-  
-  # HTML报告
-  html:
-    enabled: true
-    output: "reports/test_report.html"
-  
-  # JSON报告
-  json:
-    enabled: true
-    output: "reports/test_report.json"
-
-# ─────────────────────────────────────────────────────────────────
-# 测试账号配置（可选）
-# ─────────────────────────────────────────────────────────────────
-test_accounts:
-  # 默认测试账号
-  default:
-    username: "qatest__030"
-    email: "qatest__030@testmail.com"
-    password: "TestPass123!"
-  
-  # 管理员账号
-  admin:
-    username: "admin"
-    email: "admin@example.com"
-    password: "AdminPass123!"
-
-# ─────────────────────────────────────────────────────────────────
-# 页面分析配置
-# ─────────────────────────────────────────────────────────────────
-analyzer:
-  # 是否需要登录后才能访问页面
-  requires_auth: false
-  
-  # 登录页面URL（如果requires_auth=true）
-  login_url: "/"
-  
-  # 等待页面加载的时间（毫秒）
-  page_load_timeout: 10000
-  
-  # 忽略的元素选择器
-  ignore_selectors:
-    - ".cookie-banner"
-    - ".chat-widget"
-    - "#ad-container"
-
