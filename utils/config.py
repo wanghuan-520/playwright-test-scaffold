@@ -170,8 +170,17 @@ class ConfigManager:
         
         Args:
             name: 数据类型名称 (accounts/orders/products...)
+        
+        Returns:
+            str: 绝对路径（基于项目根目录）
         """
-        return self.get(f"test_data.{name}.path", "")
+        relative_path = self.get(f"test_data.{name}.path", "")
+        if not relative_path:
+            return ""
+        
+        # 转换为绝对路径（基于项目根目录）
+        project_root = Path(__file__).parent.parent
+        return str(project_root / relative_path)
     
     def load_test_data(self, name: str) -> Any:
         """
@@ -213,6 +222,23 @@ class ConfigManager:
             "retry_count": self.get("health_check.retry_count", 3),
             "retry_interval": self.get("health_check.retry_interval", 2),
         }
+    
+    def get_service_startup_config(self, service_name: str = None) -> Dict:
+        """
+        获取服务启动配置
+        
+        Args:
+            service_name: 服务名称（可选），如果提供则返回该服务的配置
+            
+        Returns:
+            Dict: 服务启动配置
+        """
+        startup_config = self.get("service_startup", {})
+        
+        if service_name:
+            return startup_config.get(service_name, {})
+        
+        return startup_config
     
     # ═══════════════════════════════════════════════════════════════
     # LEGACY METHODS (保持兼容)

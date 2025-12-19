@@ -1,0 +1,89 @@
+---
+alwaysApply: true
+---
+
+# 代码生成规范
+
+## Page Object 规范
+
+```python
+from core.base_page import BasePage
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+class XxxPage(BasePage):
+    # ═══════════════════════════════════════════════════════════════
+    # SELECTORS - 根据代码分析生成
+    # ═══════════════════════════════════════════════════════════════
+    
+    CURRENT_PASSWORD_INPUT = "#currentPassword"
+    NEW_PASSWORD_INPUT = "#newPassword"
+    CONFIRM_PASSWORD_INPUT = "#confirmPassword"
+    SUBMIT_BUTTON = "button[type='submit']"
+    
+    URL = "/admin/profile/change-password"
+    page_loaded_indicator = "#currentPassword"
+    
+    def navigate(self) -> None:
+        logger.info("导航到修改密码页面")
+        self.goto(self.URL)
+        self.wait_for_page_load()
+    
+    def is_loaded(self) -> bool:
+        return self.is_visible(self.page_loaded_indicator, timeout=5000)
+    
+    # ═══════════════════════════════════════════════════════════════
+    # ACTIONS - 根据功能点生成
+    # ═══════════════════════════════════════════════════════════════
+    
+    def change_password(self, current: str, new: str, confirm: str) -> None:
+        """修改密码"""
+        self.fill(self.CURRENT_PASSWORD_INPUT, current)
+        self.fill(self.NEW_PASSWORD_INPUT, new)
+        self.fill(self.CONFIRM_PASSWORD_INPUT, confirm)
+        self.click(self.SUBMIT_BUTTON)
+```
+
+## Test Case 规范
+
+```python
+@allure.feature("修改密码")
+class TestChangePassword:
+    
+    @pytest.mark.P0
+    @allure.story("密码修改")
+    @allure.title("test_p0_change_password_success")
+    @allure.description("""
+    **测试目的**: 验证使用正确的当前密码和符合规则的新密码可以成功修改
+    
+    **前置条件**: 用户已登录
+    
+    **验证规则** (来自代码分析):
+    - 新密码 8-20 字符
+    - 必须包含大写、小写、数字
+    """)
+    def test_p0_change_password_success(self, page, test_account):
+        logger = TestLogger("test_p0_change_password_success")
+        logger.start()
+        # ...
+```
+
+## Logger 使用规范
+
+```python
+# ❌ 错误：在模块级别创建 logger
+logger = TestLogger("test_xxx")
+
+# ✅ 正确：在每个测试方法内部创建 logger
+def test_p0_page_load(self):
+    logger = TestLogger("test_p0_page_load")
+    logger.start()
+    logger.checkpoint("xxx", True)
+    logger.end(success=True)
+
+# ✅ @allure.title() 只写测试方法名
+@allure.title("test_p0_page_load")  # ✅
+@allure.title("TC-CP-001: xxx")     # ❌
+```

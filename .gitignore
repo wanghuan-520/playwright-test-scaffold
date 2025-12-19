@@ -48,6 +48,12 @@ screenshots/
 logs/
 *.log
 
+# Configuration (contains local paths and sensitive info)
+config/project.yaml
+
+# Test Data (contains account usage state)
+test-data/test_account_pool.json
+
 # OS
 .DS_Store
 Thumbs.db

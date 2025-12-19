@@ -1,14 +1,16 @@
 # ═══════════════════════════════════════════════════════════════
-# Playwright Test Scaffold - Base Page
+# Playwright Test Scaffold - Base Page (Core)
 # ═══════════════════════════════════════════════════════════════
 """
-BasePage - 所有页面对象的抽象基类
-提供统一的页面操作接口，子类只需关注业务逻辑
+BasePage - 页面对象基类核心
 """
 
-from playwright.sync_api import Page, Locator, expect
+from playwright.sync_api import Page
 from abc import ABC, abstractmethod
-from typing import Optional, List, Dict, Any
+from typing import Optional
+from datetime import datetime
+from core.page_actions import PageActions
+from core.page_waits import PageWaits
 from core.page_utils import PageUtils
 from utils.logger import get_logger
 from utils.config import ConfigManager
@@ -16,54 +18,37 @@ from utils.config import ConfigManager
 logger = get_logger(__name__)
 
 
-class BasePage(ABC):
-    """
-    页面对象基类 - 模板方法模式
+class BasePage(ABC, PageActions, PageWaits):
+    """页面对象基类 - 继承操作和等待能力"""
     
-    使用方式:
-        class LoginPage(BasePage):
-            URL = "/login"
-            
-            # 元素选择器
-            USERNAME_INPUT = "#username"
-            PASSWORD_INPUT = "#password"
-            SUBMIT_BUTTON = "button[type='submit']"
-            
-            def navigate(self):
-                self.goto(self.URL)
-            
-            def is_loaded(self) -> bool:
-                return self.is_visible(self.USERNAME_INPUT)
-            
-            def login(self, username: str, password: str):
-                self.fill(self.USERNAME_INPUT, username)
-                self.fill(self.PASSWORD_INPUT, password)
-                self.click(self.SUBMIT_BUTTON)
-    """
-    
-    # 子类可覆盖的类属性
     URL: str = "/"
     page_loaded_indicator: str = "body"
     
     def __init__(self, page: Page):
-        """
-        初始化页面对象
-        
-        Args:
-            page: Playwright Page对象
-        """
+        """初始化页面对象"""
         self.page = page
         self.utils = PageUtils(page)
         self.config = ConfigManager()
-        self.base_url = self.config.get_base_url()
-        
-        logger.debug(f"初始化页面对象: {self.__class__.__name__}")
+        self.base_url = self.config.get_service_url("frontend") or ""
     
     # ═══════════════════════════════════════════════════════════════
-    # ABSTRACT METHODS - 子类必须实现
+    # ABSTRACT METHODS
     # ═══════════════════════════════════════════════════════════════
     
     @abstractmethod
+    def navigate(self) -> None:
+        """导航到页面"""
+        pass
+    
+    @abstractmethod
+    def is_loaded(self) -> bool:
+        """检查页面是否加载完成"""
+        pass
+    
+    # ═══════════════════════════════════════════════════════════════
+    # NAVIGATION
+    # ═══════════════════════════════════════════════════════════════
+    
     def navigate(self) -> None:
         """导航到页面 - 子类必须实现"""
         pass
@@ -133,84 +118,11 @@ class BasePage(ABC):
         self.wait_for_page_load()
     
     # ═══════════════════════════════════════════════════════════════
-    # ELEMENT INTERACTION METHODS
+
     # ═══════════════════════════════════════════════════════════════
-    
-    def click(self, selector: str, timeout: int = 10000) -> None:
-        """
-        点击元素
-        
-        Args:
-            selector: 元素选择器
-            timeout: 超时时间(毫秒)
-        """
-        logger.debug(f"点击元素: {selector}")
-        self.page.click(selector, timeout=timeout)
-    
-    def fill(self, selector: str, value: str, timeout: int = 10000) -> None:
-        """
-        填写输入框
-        
-        Args:
-            selector: 元素选择器
-            value: 要填写的值
-            timeout: 超时时间(毫秒)
-        """
-        logger.debug(f"填写输入框: {selector} = {value}")
-        self.page.wait_for_selector(selector, state="visible", timeout=timeout)
-        self.page.fill(selector, value, timeout=timeout)
-    
-    def clear_and_fill(self, selector: str, value: str, timeout: int = 10000) -> None:
-        """
-        清空并填写输入框
-        
-        Args:
-            selector: 元素选择器
-            value: 要填写的值
-            timeout: 超时时间(毫秒)
-        """
-        logger.debug(f"清空并填写: {selector} = {value}")
-        element = self.page.locator(selector)
-        element.clear()
-        element.fill(value)
-    
-    def type_text(self, selector: str, text: str, delay: int = 50) -> None:
-        """
-        逐字符输入文本（模拟真实输入）
-        
-        Args:
-            selector: 元素选择器
-            text: 要输入的文本
-            delay: 字符间延迟(毫秒)
-        """
-        logger.debug(f"逐字符输入: {selector}")
-        self.page.locator(selector).type(text, delay=delay)
-    
-    def select_option(self, selector: str, value: str) -> None:
-        """
-        选择下拉框选项
-        
-        Args:
-            selector: 元素选择器
-            value: 选项值
-        """
-        logger.debug(f"选择选项: {selector} = {value}")
-        self.page.select_option(selector, value)
-    
-    def check(self, selector: str) -> None:
-        """勾选复选框"""
-        logger.debug(f"勾选: {selector}")
-        self.page.check(selector)
-    
-    def uncheck(self, selector: str) -> None:
-        """取消勾选复选框"""
-        logger.debug(f"取消勾选: {selector}")
-        self.page.uncheck(selector)
-    
+    # QUERY METHODS
     # ═══════════════════════════════════════════════════════════════
-    # ELEMENT STATE METHODS
-    # ═══════════════════════════════════════════════════════════════
-    
+
     def is_visible(self, selector: str, timeout: int = 5000) -> bool:
         """
         检查元素是否可见
@@ -276,94 +188,64 @@ class BasePage(ABC):
         """
         return self.page.get_attribute(selector, attribute)
     
-    # ═══════════════════════════════════════════════════════════════
-    # WAIT METHODS
-    # ═══════════════════════════════════════════════════════════════
-    
-    def wait_for_element(self, selector: str, state: str = "visible", timeout: int = 10000) -> None:
-        """
-        等待元素出现
-        
-        Args:
-            selector: 元素选择器
-            state: 状态（visible, attached, detached, hidden）
-            timeout: 超时时间(毫秒)
-        """
-        logger.debug(f"等待元素: {selector} ({state})")
-        self.page.wait_for_selector(selector, state=state, timeout=timeout)
-    
-    def wait_for_url(self, url_pattern: str, timeout: int = 10000) -> None:
-        """
-        等待URL匹配
-        
-        Args:
-            url_pattern: URL模式（支持正则）
-            timeout: 超时时间(毫秒)
-        """
-        logger.debug(f"等待URL匹配: {url_pattern}")
-        self.page.wait_for_url(url_pattern, timeout=timeout)
-    
-    def wait(self, milliseconds: int) -> None:
-        """
-        等待指定时间
-        
-        Args:
-            milliseconds: 等待时间(毫秒)
-        """
-        self.page.wait_for_timeout(milliseconds)
-    
-    # ═══════════════════════════════════════════════════════════════
-    # PAGE INFO METHODS
-    # ═══════════════════════════════════════════════════════════════
-    
-    def get_url(self) -> str:
-        """获取当前URL"""
-        return self.page.url
-    
-    def get_title(self) -> str:
-        """获取页面标题"""
-        return self.page.title()
-    
+    # ══════════════════════════════════════
     # ═══════════════════════════════════════════════════════════════
     # SCREENSHOT METHODS
     # ═══════════════════════════════════════════════════════════════
     
-    def take_screenshot(self, name: str, full_page: bool = False) -> bytes:
+    def take_screenshot(self, name: str = "screenshot", full_page: bool = True) -> str:
         """
-        截取屏幕截图
+        截取页面截图
         
         Args:
-            name: 截图名称（无需扩展名）
-            full_page: 是否截取整页
+            name: 截图名称（用于保存文件）
             
         Returns:
-            bytes: 截图数据
+            str: 截图文件路径
         """
-        return self.utils.take_screenshot(
-            file_path=f"screenshots/{name}.png",
-            full_page=full_page,
-            attach_to_allure=True,
-            step_name=name
+        from pathlib import Path
+        import allure
+        
+        # 创建截图目录
+        screenshot_dir = Path("screenshots")
+        screenshot_dir.mkdir(exist_ok=True)
+        
+        # 生成截图文件路径
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{name}_{timestamp}.png"
+        filepath = screenshot_dir / filename
+        
+        # 截取截图
+        screenshot_bytes = self.page.screenshot(full_page=full_page)
+        
+        # 保存文件
+        with open(filepath, "wb") as f:
+            f.write(screenshot_bytes)
+        
+        # 附加到 Allure 报告
+        allure.attach(
+            screenshot_bytes,
+            name=name,
+            attachment_type=allure.attachment_type.PNG
         )
+        
+        logger.info(f"截图已保存: {filepath}")
+        return str(filepath)
+    
+
+    
+    def get_title(self) -> str:
+        """
+        获取页面标题
+        
+        Returns:
+            str: 页面标题
+        """
+        return self.page.title()
     
     # ═══════════════════════════════════════════════════════════════
-    # ASSERTION HELPERS
+    # WAIT METHODS
     # ═══════════════════════════════════════════════════════════════
-    
-    def assert_visible(self, selector: str, message: str = None) -> None:
-        """断言元素可见"""
-        expect(self.page.locator(selector)).to_be_visible()
-        logger.info(f"✓ 断言通过: 元素可见 - {selector}")
-    
-    def assert_text(self, selector: str, expected_text: str) -> None:
-        """断言元素文本"""
-        expect(self.page.locator(selector)).to_have_text(expected_text)
-        logger.info(f"✓ 断言通过: 文本匹配 - {expected_text}")
-    
-    def assert_url_contains(self, text: str) -> None:
-        """断言URL包含指定文本"""
-        expect(self.page).to_have_url(f"*{text}*")
-        logger.info(f"✓ 断言通过: URL包含 - {text}")
 
 
 class BaseDialog(BasePage):

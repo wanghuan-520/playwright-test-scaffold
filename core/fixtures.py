@@ -10,10 +10,12 @@ import os
 from pathlib import Path
 from playwright.sync_api import Page, BrowserContext
 from utils.config import ConfigManager
+from utils.data_manager import DataManager
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 config = ConfigManager()
+data_manager = DataManager()
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -271,3 +273,43 @@ def screenshot_on_failure(request, page: Page):
             logger.info(f"📸 失败截图已保存: {screenshot_path}")
         except Exception as e:
             logger.error(f"截图失败: {e}")
+
+
+# ═══════════════════════════════════════════════════════════════
+# TEST DATA MANAGEMENT
+# ═══════════════════════════════════════════════════════════════
+
+@pytest.fixture(scope="function", autouse=True)
+def test_account(request):
+    """
+    测试账号 fixture - 每个测试用例使用独立的测试账号
+    
+    功能:
+    1. 测试前: 自动清理账号状态（解锁、重置）
+    2. 测试中: 为测试用例分配独立的测试账号
+    3. 测试后: 自动清理账号状态（释放、恢复）
+    
+    使用方式:
+        def test_xxx(self, page, test_account):
+            username = test_account["username"]
+            password = test_account["password"]
+    """
+    test_name = request.node.name
+    
+    # 测试前数据清洗
+    logger.info(f"🧹 测试前数据清洗: {test_name}")
+    data_manager.cleanup_before_test(test_name)
+    
+    # 分配测试账号
+    account = data_manager.get_test_account(test_name)
+    logger.info(f"📦 测试用例 {test_name} 分配账号: {account['username']}")
+    
+    yield account
+    
+    # 测试后数据清洗
+    success = True
+    if hasattr(request.node, 'rep_call') and request.node.rep_call.failed:
+        success = False
+    
+    logger.info(f"🧹 测试后数据清洗: {test_name} (成功: {success})")
+    data_manager.cleanup_after_test(test_name, success=success)

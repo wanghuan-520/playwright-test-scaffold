@@ -1,9 +1,6 @@
 # ═══════════════════════════════════════════════════════════════
-# Playwright Test Scaffold - Root Conftest
+# Playwright Test Scaffold - Root Conftest (Shared Session)
 # ═══════════════════════════════════════════════════════════════
-"""
-根目录conftest.py - 导入核心fixtures
-"""
 
 import sys
 from pathlib import Path
@@ -16,3 +13,5 @@ if str(project_root) not in sys.path:
 # 导入核心fixtures
 from core.fixtures import *
 
+# 导入共享session fixtures
+from core.shared_session_v2 import *

@@ -14,7 +14,7 @@ import re
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from generators.page_analyzer import PageInfo, PageElement
+    from generators.page_types import PageInfo, PageElement
 
 
 # ═══════════════════════════════════════════════════════════════

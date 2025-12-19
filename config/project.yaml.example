@@ -1,0 +1,166 @@
+# ═══════════════════════════════════════════════════════════════
+# Playwright Test Scaffold - Project Configuration
+# ═══════════════════════════════════════════════════════════════
+# AI 驱动的自动化测试脚手架 - 项目配置中心
+
+# ─────────────────────────────────────────────────────────────────
+# 项目基本信息
+# ─────────────────────────────────────────────────────────────────
+project:
+  name: "My Web Application"              # 修改为你的项目名称
+  description: "UI Automation Tests"      # 修改为你的项目描述
+  version: "1.0.0"
+
+# ─────────────────────────────────────────────────────────────────
+# 代码仓库配置（本地路径或 GitHub URL）
+# ─────────────────────────────────────────────────────────────────
+repositories:
+  frontend:
+    # 本地路径（用于代码分析）- 修改为你的前端项目路径
+    local_path: "/path/to/your/frontend"
+    # GitHub URL（可选）
+    url: ""                              # 如: https://github.com/owner/frontend
+    branch: "main"
+    description: "前端项目 - Next.js + React + TypeScript"
+    tech_stack:
+      framework: "Next.js"
+      version: "15.x"
+      language: "TypeScript"
+      ui_library: "React"
+  
+  backend:
+    # 本地路径（用于代码分析）- 修改为你的后端项目路径
+    local_path: "/path/to/your/backend"
+    # GitHub URL（可选）
+    url: ""                              # 如: https://github.com/owner/backend
+    branch: "main"
+    description: "后端 API 服务"
+    tech_stack:
+      framework: "ABP Framework"         # 或其他框架
+      version: "8.x"
+      language: ".NET"
+      runtime: ".NET Aspire"
+
+# ─────────────────────────────────────────────────────────────────
+# 多环境服务地址配置
+# ─────────────────────────────────────────────────────────────────
+environments:
+  default: "dev"
+  
+  dev:
+    frontend:
+      url: "https://localhost:3000"
+      health_check: "/"                  # 健康检查路径
+    backend:
+      url: "https://localhost:44320"
+      health_check: "/api/health"
+  
+  staging:
+    frontend:
+      url: "https://staging.example.com"
+      health_check: "/"
+    backend:
+      url: "https://staging-api.example.com"
+      health_check: "/api/health"
+  
+  production:
+    frontend:
+      url: "https://www.example.com"
+      health_check: "/"
+    backend:
+      url: "https://api.example.com"
+      health_check: "/api/health"
+
+# ─────────────────────────────────────────────────────────────────
+# 测试数据配置（支持多种类型）
+# ─────────────────────────────────────────────────────────────────
+test_data:
+  # 测试账号池
+  accounts:
+    path: "test-data/test_account_pool.json"
+    description: "测试账号池"
+  
+  # 可扩展：添加其他测试数据类型
+  # orders:
+  #   path: "test-data/orders.json"
+  #   description: "订单测试数据"
+  #
+  # products:
+  #   path: "test-data/products.json"
+  #   description: "商品测试数据"
+
+# ─────────────────────────────────────────────────────────────────
+# 服务启动配置（可选）
+# ─────────────────────────────────────────────────────────────────
+service_startup:
+  enabled: true                          # 是否启用自动启动
+  auto_start: true                       # 检测到服务未启动时自动启动
+  
+  frontend:
+    # 启动方式: npm, yarn, dotnet, python, custom
+    type: "npm"
+    # 启动命令 - 修改为你的启动命令
+    command: "npm run dev"
+    # 工作目录（前端项目路径）- 修改为你的前端项目路径
+    cwd: "/path/to/your/frontend"
+    # 环境变量
+    env: {}
+    # 启动超时时间（秒）
+    timeout: 60
+  
+  backend:
+    type: "dotnet"                       # 根据你的后端技术栈修改
+    # 启动命令 - 修改为你的启动命令
+    command: "dotnet run"
+    # 工作目录（后端项目路径）- 修改为你的后端项目路径
+    cwd: "/path/to/your/backend"
+    # 环境变量
+    env: {}
+    # 启动超时时间（秒）
+    timeout: 120
+
+# ─────────────────────────────────────────────────────────────────
+# 服务健康检查配置
+# ─────────────────────────────────────────────────────────────────
+health_check:
+  enabled: true                          # 是否启用服务检查
+  timeout: 10                            # 超时时间（秒）
+  retry_count: 3                         # 重试次数
+  retry_interval: 2                      # 重试间隔（秒）
+
+# ─────────────────────────────────────────────────────────────────
+# 浏览器配置
+# ─────────────────────────────────────────────────────────────────
+browser:
+  headless: true                         # 无头模式
+  slow_mo: 0                             # 操作延迟（毫秒）
+  timeout: 30000                         # 默认超时（毫秒）
+  viewport:
+    width: 1920
+    height: 1080
+  type: "chromium"                       # chromium, firefox, webkit
+  args:
+    - "--disable-web-security"
+    - "--ignore-certificate-errors"
+    - "--allow-insecure-localhost"
+    - "--disable-gpu"
+    - "--no-sandbox"
+
+# ─────────────────────────────────────────────────────────────────
+# 测试执行配置
+# ─────────────────────────────────────────────────────────────────
+test:
+  retry_count: 2                         # 失败重试次数
+  implicit_wait: 10                      # 隐式等待时间（秒）
+  screenshot_on_failure: true            # 失败时截图
+  video_recording: false                 # 视频录制
+  parallel_workers: "auto"               # 并行 worker 数量
+
+# ─────────────────────────────────────────────────────────────────
+# 报告配置
+# ─────────────────────────────────────────────────────────────────
+reports:
+  allure:
+    enabled: true
+    results_dir: "allure-results"
+    report_dir: "allure-report"
