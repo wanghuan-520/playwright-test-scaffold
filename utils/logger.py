@@ -65,6 +65,8 @@ class TestLogger:
         logger.step("点击登录按钮")
         logger.checkpoint("验证登录成功")
     """
+    # pytest 会把以 Test 开头的类当作测试收集对象；显式关闭收集
+    __test__ = False
     
     def __init__(self, test_name: str):
         """

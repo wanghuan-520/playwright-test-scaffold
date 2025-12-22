@@ -12,8 +12,6 @@ alwaysApply: true
 .cursor/rules/
 ├── core/
 │   └── project-overview.md          # ✅ 项目定位、核心流程、架构
-├── project-specific/
-│   └── aevatar-station.md           # ✅ Aevatar Agent Station 项目特定规则
 ├── workflow/
 │   ├── analysis-and-generation.md  # ✅ 页面分析和代码生成（Step 1-5）
 │   ├── test-execution.md           # ✅ 自动测试执行流程
@@ -34,7 +32,7 @@ alwaysApply: true
 ### 核心规则优先级
 
 1. **core/project-overview.md** - 首要阅读，了解项目定位
-2. **project-specific/aevatar-station.md** - Aevatar Agent Station 项目特定规则
+2. **docs/requirements.md** - Aevatar Agent Station 项目特定规则（已从 `.cursor/rules/project-specific/` 迁移）
 3. **workflow/analysis-and-generation.md** - 页面分析和代码生成流程
 4. **workflow/test-execution.md** - 自动测试执行流程
 5. **workflow/ai-commands.md** - AI 指令处理规范
@@ -48,7 +46,7 @@ alwaysApply: true
 
 **AI 执行**：
 1. 读取 core/project-overview.md → 确认工作模式
-2. 读取 project-specific/aevatar-station.md → 了解项目特定规则
+2. 读取 docs/requirements.md → 了解项目特定规则
 3. 执行 workflow/analysis-and-generation.md → 分析页面并生成代码
 4. 执行 workflow/test-execution.md → 运行测试并生成报告
 5. 遵循 quality/*** → 确保代码质量

@@ -20,18 +20,40 @@ alwaysApply: true
    └─ 后端服务（https://localhost:44320）
    
 2. 运行 pytest
-   └─ pytest tests/test_<page_name>.py -v --alluredir=allure-results
+   └─ pytest tests/test_<page_name>.py -v
    
 3. 收集测试结果
    
 4. 生成 Allure 报告
    
 5. 自动打开报告（必须）
-   └─ allure serve allure-results
-   └─ 在后台启动本地服务器并自动打开浏览器
+   ├─ allure generate allure-results -o allure-report --clean
+   └─ **优先用静态 HTTP 服务打开**（更稳，不依赖 allure open/serve 子进程）：
+      - python3 -m http.server 59717 --bind 127.0.0.1 --directory "allure-report"
+      - 打开：http://127.0.0.1:59717/
+
+   备选（可用但不如静态服务稳）：
+   - allure open allure-report  （HTTP 打开，避免 file:// 一直 Loading）
    
 6. 反馈测试结果摘要
 ```
+
+## ✅ Allure 报告打开强制规则（必须遵守）
+
+- **强烈推荐**：优先使用 `python3 -m http.server --directory allure-report` 提供静态服务（本项目在并发/进程资源紧张时，allure open/serve 偶发启动失败）。
+- 若使用静态服务：建议固定端口（例如 59717），并在启动前杀掉旧进程（避免端口占用）。
+
+
+- **必须**: 最终打开方式必须是 **HTTP**（二选一即可）：
+  - `python3 -m http.server --directory allure-report`（推荐，最稳）
+  - `allure open allure-report`（可用）
+- **禁止**: 使用 `open allure-report/index.html`（file:// 方式，可能导致 Allure 一直 Loading）
+
+## 🧠 执行稳定性规则（避免 ABP lockout）
+
+- **必须**: 大规模用例集（P1/P2/security）优先使用 `auth_page`（基于 `storage_state`）复用登录态
+- **禁止**: 在每条用例内重复走 `/auth/login` → `/Account/Login`
+- **建议**: 示例用例必须使用 `example` 标记，避免混入 P0/P1/P2/security 回归集合
 
 ## 自动化规则
 
@@ -90,20 +112,19 @@ def check_services():
 # 2. 运行测试
 def run_tests(test_file: str):
     """运行生成的测试文件"""
-    cmd = f"pytest {test_file} -v --alluredir=allure-results"
+    # pytest.ini 已配置 --alluredir=allure-results
+    cmd = f"pytest {test_file} -v"
     result = shell(cmd, timeout=180000)  # 3分钟超时
     return parse_pytest_output(result.output)
 
 # 3. 生成并自动打开 Allure 报告
 def open_allure_report():
     """生成 Allure 报告并自动在浏览器中打开"""
-    # allure serve 会自动:
-    # 1. 生成报告
-    # 2. 启动本地服务器
-    # 3. 自动打开默认浏览器
-    result = shell("allure serve allure-results", is_background=True)
-    time.sleep(2)  # 等待服务器启动
-    return "http://localhost:随机端口"
+    # 先生成静态报告
+    shell("allure generate allure-results -o allure-report --clean", timeout=60000)
+    # 使用 HTTP 打开（Allure 内置 WebServer），避免浏览器 file:// 策略导致一直 Loading
+    result = shell("allure open allure-report -h 127.0.0.1 -p 0", is_background=True)
+    return "allure open allure-report"
 ```
 
 ## 清理机制说明
@@ -156,6 +177,14 @@ Step 2: 运行 pytest
 ```
 
 ## 结果反馈格式
+
+## 常见问题
+
+### Allure 报告用 file:// 打开一直 Loading
+
+- **原因**: 浏览器安全策略可能阻止 Allure 在 file:// 下加载报告数据。
+- **解决**: 使用 HTTP 打开：`allure open allure-report`（推荐）或 `allure serve allure-results`。
+
 
 **全部通过时**：
 ```
@@ -217,3 +246,38 @@ python -c "import shutil; shutil.rmtree('allure-results', ignore_errors=True); s
 ---
 
 **核心原则：每次测试都是干净的开始，所有数据只反映本次测试结果。** ✨
+
+
+# ✅ 闭环执行（强制）
+
+> 目标：当用例很多、失败很多时，仍能**快速收敛**；并且 Allure 报告永远只反映“本次运行”。
+
+## 0) 执行前清理（必须）
+
+- **默认必须清理**（每次 pytest run 视为一次独立 run，不允许混入历史）：
+  - `allure-results/`
+  - `allure-report/`
+  - `screenshots/`
+
+- **例外（仅当你明确需要 Allure 趋势/history）**：允许保留 `allure-results/history/`。
+  - 触发方式：设置环境变量 `KEEP_ALLURE_HISTORY=1`
+  - 除 `history/` 外，其它仍必须清理
+
+## 1) 失败时证据自动采集（必须）
+
+任何测试失败，都必须自动采集并在 Allure 中可见（否则视为“不可诊断失败”）：
+
+- **screenshot**：失败时至少 1 张全页截图
+- **console logs**：至少包含失败用例期间的 console 输出
+- **requestfailed**：至少包含失败用例期间的 requestfailed 列表（method/url/error）
+- **trace**：对需要登录态的用例（默认 `auth_page`）必须生成 Playwright trace（zip）并附加
+
+## 2) 批量失败的收敛策略（必须遵守的执行顺序）
+
+当失败数量较多时，禁止逐条“补断言/改 sleep”式修补。
+必须按以下顺序收敛：
+
+1. **P0 优先**：先跑 `-m P0` 止血
+2. **分型**：把失败归类为 INFRA / AUTH-DATA / SELECTOR / RULE-DRIFT / RACE
+3. **修根因**：优先修框架/公共 helper/选择器策略/规则推导，不在单条用例里打补丁
+4. **只重跑失败**：`--lf` 或 `-k`，直到失败归零

@@ -10,6 +10,8 @@
 - [阶段 1: 页面分析与代码生成](#阶段-1-页面分析与代码生成)
 - [阶段 2: 自动测试执行](#阶段-2-自动测试执行)
 - [阶段 3: 报告查看与分析](#阶段-3-报告查看与分析)
+- [测试需求（需求库）](#测试需求需求库)
+- [规则沉淀（踩坑固化）](#规则沉淀踩坑固化)
 - [核心框架支撑](#核心框架支撑)
 - [数据流转](#数据流转)
 
@@ -27,7 +29,7 @@
                                           ▼
                               读取 AI 规则系统（.cursor/rules/）
                               ├─ core/project-overview.md
-                              ├─ project-specific/aevatar-station.md
+                              ├─ docs/requirements.md（项目独有规则，迁移自 project-specific）
                               ├─ workflow/analysis-and-generation.md
                               └─ workflow/test-execution.md
                                           │
@@ -46,6 +48,16 @@
 ║                        阶段 3: 报告查看与分析（自动打开）                                     ║
 ╚════════════════════════════════════════════════════════════════════════════════════════════╝
 ```
+
+---
+
+## 测试需求（需求库）
+
+需求沉淀入口：`docs/requirements.md`
+
+用法建议：
+- 每次新增/变更需求，先补一条 `REQ-...`（标题 + 验收标准）
+- 用例落地后，在需求条目里补上“测试映射（用例名）”
 
 ---
 
@@ -72,13 +84,18 @@
 ```
 输入: "/admin/profile/change-password"
   ↓
-推断代码位置:
-  ├─ src/pages/admin/profile/ChangePassword.tsx
-  ├─ src/pages/admin/profile/change-password/page.tsx
-  └─ src/views/admin/profile/ChangePassword/index.tsx
+推断“本次生成/运行的套件目录”（pytest 默认目标）:
+  └─ tests/admin/profile_change_password
+
+规则（来自 tools/url_flow.py::_infer_suite_dir_from_url）：
+- module: URL 第一段（例：admin）
+- page: 从第二段开始把 path 用 '_' 拼接，且 '-' → '_'（例：profile/change-password → profile_change_password）
 ```
 
-### Step 3A: GitHub 代码分析（静态分析）
+### Step 3A: GitHub 代码分析（静态分析，概念示例）
+
+> ⚠️ 注意：当前 CLI 默认入口（`tools/url_flow.py`）**不依赖 GitHub 静态分析**。
+> 本节仅作为“可扩展方向”的概念说明；实际生成以 **Playwright 动态分析** 或 `--analysis-json` 输入为准。
 
 ```
 查询 GitHub 仓库
@@ -114,67 +131,49 @@
 - ✅ API 接口（请求方法、参数、响应）
 - ✅ 业务逻辑（条件判断、流程分支）
 
-### Step 3B: Playwright MCP 分析（动态分析）
+### Step 3B: Playwright 动态分析（由 url_flow 执行）
 
 ```
-检查服务状态
-  ├─ curl https://localhost:3000 → ✅ HTTP 200
-  └─ curl https://localhost:44320/api/health → ✅ HTTP 200
-  ↓
-服务已启动，开始 MCP 分析
-  ↓
-browser_navigate
-  └─ 导航到 https://localhost:3000/admin/profile/change-password
-  ↓
-browser_snapshot
-  └─ 获取页面可访问性快照
-      ├─ 元素: 3 个 input[type="password"]
-      ├─ 元素: 1 个 button[type="submit"]
-      └─ 元素状态: required=true, disabled=false
-  ↓
-browser_evaluate
-  └─ 执行 JavaScript 提取元素信息
-      ├─ document.querySelectorAll('input[type="password"]')
-      ├─ document.querySelector('button[type="submit"]')
-      └─ 元素属性、状态、位置
+PageAnalyzer（generators/page_analyzer.py）
+  └─ 用 Playwright 打开 https://localhost:3000/admin/profile/change-password
+      ├─ 提取：可交互元素（inputs/buttons/links）
+      ├─ 提取：可访问性快照（a11y snapshot）
+      └─ 可选落盘：DOM/screenshot/a11y.json（reports/analysis/）
 ```
 
 **提取的信息**:
 - ✅ 实际渲染的元素
-- ✅ 元素选择器（#currentPassword, #newPassword...）
-- ✅ 可访问性信息（role, name, state）
-- ✅ 元素的实际状态（disabled, required, visible）
+- ✅ 元素选择器（优先 role/name，其次 id/name/placeholder 等）
+- ✅ 元素的实际状态（disabled, visible）
+
+> 离线模式：若你已有 PageInfo JSON（通常来自 Cursor/Playwright MCP 导出），可用 `--analysis-json` 跳过动态分析：
+> `python3 -m tools.url_flow --url "<url>" --analysis-json test-data/mcp_pageinfo_examples/admin_profile_change_password_pageinfo.json --no-run`
 
 ### Step 4: 合并分析结果
 
 ```
-MCP 分析结果（实际元素）
+动态分析结果（实际元素）
   +
-GitHub 分析结果（业务逻辑）
+（可选）静态分析结果（业务逻辑）
   ↓
 生成完整的 PageInfo 对象:
   ├─ page_url: "/admin/profile/change-password"
-  ├─ page_name: "ChangePasswordPage"
+  ├─ page_name: "AdminProfileChangePasswordPage"
   ├─ elements: [
   │   {
   │     name: "currentPassword",
-  │     selector: "#currentPassword",
-  │     type: "password",
-  │     required: true,
-  │     validation: { minLength: 8, maxLength: 20 }
+  │     selector: "[name='currentPassword']",
+  │     type: "password"
   │   },
   │   {
   │     name: "newPassword",
-  │     selector: "#newPassword",
-  │     type: "password",
-  │     required: true,
-  │     validation: { 
-  │       minLength: 8, 
-  │       maxLength: 20,
-  │       requireUppercase: true,
-  │       requireLowercase: true,
-  │       requireDigit: true
-  │     }
+  │     selector: "[name='newPassword']",
+  │     type: "password"
+  │   },
+  │   {
+  │     name: "confirmNewPassword",
+  │     selector: "[name='confirmNewPassword']",
+  │     type: "password"
   │   },
   │   ...
   │ ]
@@ -190,7 +189,7 @@ GitHub 分析结果（业务逻辑）
 #### 5.1 生成 Page Object
 
 ```python
-# pages/change_password_page.py
+# pages/admin_profile_change_password_page.py（示例：生成产物）
 
 from core.base_page import BasePage
 from utils.logger import get_logger
@@ -198,18 +197,19 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 
-class ChangePasswordPage(BasePage):
+class AdminProfileChangePasswordPage(BasePage):
     # ═══════════════════════════════════════════════════════════════
-    # SELECTORS - 根据 MCP 分析的实际元素生成
+    # SELECTORS - 根据动态分析得到的实际元素生成
     # ═══════════════════════════════════════════════════════════════
     
-    CURRENT_PASSWORD_INPUT = "#currentPassword"
-    NEW_PASSWORD_INPUT = "#newPassword"
-    CONFIRM_PASSWORD_INPUT = "#confirmPassword"
-    SUBMIT_BUTTON = "button[type='submit']"
+    # 实际生成更倾向于用 name 属性（避免 id 漂移）
+    CURRENTPASSWORD_INPUT = "[name='currentPassword']"
+    NEWPASSWORD_INPUT = "[name='newPassword']"
+    CONFIRMNEWPASSWORD_INPUT = "[name='confirmNewPassword']"
+    SAVE_BUTTON = "button[type='submit']"
     
     URL = "/admin/profile/change-password"
-    page_loaded_indicator = "#currentPassword"
+    page_loaded_indicator = "button[type='submit']"
     
     def navigate(self) -> None:
         """导航到修改密码页面"""
@@ -218,103 +218,49 @@ class ChangePasswordPage(BasePage):
         self.wait_for_page_load()
     
     # ═══════════════════════════════════════════════════════════════
-    # ACTIONS - 根据业务逻辑生成
+    # ACTIONS - 根据页面实际交互生成
     # ═══════════════════════════════════════════════════════════════
     
-    def change_password(self, current: str, new: str, confirm: str) -> None:
-        """修改密码"""
-        self.fill(self.CURRENT_PASSWORD_INPUT, current)
-        self.fill(self.NEW_PASSWORD_INPUT, new)
-        self.fill(self.CONFIRM_PASSWORD_INPUT, confirm)
-        self.click(self.SUBMIT_BUTTON)
+    # 生成代码里通常会提供字段级 fill_* 与 click_save 等基础动作
 ```
 
 #### 5.2 生成测试用例
 
 ```python
-# tests/test_change_password.py
+# tests/admin/profile_change_password/test_profile_change_password_settings_p0.py（示例：生成产物）
 
 import pytest
 import allure
-from pages.change_password_page import ChangePasswordPage
-from utils.logger import TestLogger
+from playwright.sync_api import Page
+from pages.admin_profile_change_password_page import AdminProfileChangePasswordPage
 
-@allure.feature("修改密码")
-class TestChangePassword:
-    
-    # ═══════════════════════════════════════════════════════════════
-    # P0 测试 - 核心功能（4个）
-    # ═══════════════════════════════════════════════════════════════
-    
-    @pytest.mark.P0
-    @allure.story("密码修改")
-    @allure.title("test_p0_change_password_success")
-    def test_p0_change_password_success(self, page, test_account):
-        """P0: 正常修改密码"""
-        logger = TestLogger("test_p0_change_password_success")
-        logger.start()
-        
-        # 登录
-        self._login(page, test_account)
-        
-        # 导航到页面
-        change_password_page = ChangePasswordPage(page)
-        change_password_page.navigate()
-        with allure.step("导航到修改密码页面"):
-            change_password_page.take_screenshot("step_navigate", full_page=True)
-        
-        # 修改密码
-        current_password = test_account["password"]
-        new_password = "NewPass123!"
-        change_password_page.change_password(current_password, new_password, new_password)
-        
-        # 等待 toast 出现
-        page.wait_for_timeout(500)
-        # ... toast 等待逻辑 ...
-        
-        with allure.step("点击保存按钮"):
-            change_password_page.take_screenshot("step_click_save", full_page=True)
-        
-        logger.checkpoint("密码修改成功", True)
-        logger.end(success=True)
-    
-    # ═══════════════════════════════════════════════════════════════
-    # P1 测试 - 重要功能（8个）
-    # ═══════════════════════════════════════════════════════════════
-    
-    @pytest.mark.P1
-    @allure.story("密码验证")
-    @allure.title("test_p1_password_too_short")
-    def test_p1_password_too_short(self, page, test_account):
-        """P1: 密码太短 - 验证 ABP RequiredLength 规则"""
-        # ... 测试逻辑 ...
+@pytest.mark.P0
+@pytest.mark.functional
+def test_p0_page_load(auth_page: Page):
+    po = AdminProfileChangePasswordPage(auth_page)
+    po.navigate()
+    assert po.is_loaded()
+    po.take_screenshot("profile_change_password_settings_p0_page_load", full_page=True)
 ```
 
 **生成的测试用例**:
-- ✅ **P0 测试**（4个）: 页面加载 + 主流程 + 必填字段验证
-- ✅ **P1 测试**（8个）: 边界值 + 格式验证 + API 错误处理
-- ✅ **P2 测试**（1个）: UI 交互
+- ✅ **P0**：页面加载 + 主流程（带 UI 回滚）+ 必填校验（能观察到错误 UI 才硬断言，否则自动 skip）
+- ✅ **P1/P2/security**：按“是否推导出规则/selector”决定生成强度；缺规则时会自动 skip（拒绝凭猜）
 
 ---
 
 ## 阶段 2: 自动测试执行
 
-### Step 0: 清理旧数据（必须）⭐
+### Step 0: 清理旧数据（默认会做，但有并发安全与开关）⭐
 
 ```bash
-# 自动执行 clean_old_test_data()
+默认清理由 `core/fixtures.py::setup_test_environment` 执行，并且对 xdist 并发做了防踩踏处理：
+- primary worker（gw0）负责清场
+- 其他 worker 等待清场完成再开始写入
 
-rm -rf allure-results/    # 删除旧的测试结果数据
-rm -rf allure-report/     # 删除旧的 HTML 报告
-rm -rf screenshots/       # 删除旧的测试截图
-
-mkdir allure-results/     # 重建目录
-mkdir screenshots/        # 重建目录
-
-✅ 已清理旧的测试结果: allure-results/
-✅ 已清理旧的测试报告: allure-report/
-✅ 已清理旧的测试截图: screenshots/
-✅ 已创建新的测试数据目录
+你可以用开关改变行为：
+- `APPEND_ALLURE_RESULTS=1`：追加模式，不清空结果（适合“分段跑后汇总”）
+- `KEEP_ALLURE_HISTORY=1`：清理时保留 `allure-results/history`（趋势）
 ```
 
 **为什么必须清理？**
@@ -322,21 +268,12 @@ mkdir screenshots/        # 重建目录
 - ✅ 确保结果准确（每次测试独立）
 - ✅ 便于问题定位（只看本次测试）
 
-### Step 1: 检查服务状态
+### Step 1: 检查服务状态（可选）
 
 ```bash
-# 自动执行 ServiceChecker.check()
-
-curl -k https://localhost:3000 -I
-curl -k https://localhost:44320/api/health -I
-
-═══════════════════════════════════════════════════════
-服务状态检查
-═══════════════════════════════════════════════════════
-✅ frontend: https://localhost:3000 (HTTP 200)
-✅ backend: https://localhost:44320 (HTTP 200)
-═══════════════════════════════════════════════════════
-✅ 所有服务正常运行
+框架提供 `ensure_services_running` fixture（默认不启用）：
+- 需要时对用例/类加：`@pytest.mark.usefixtures("ensure_services_running")`
+- 服务检查实现：`utils/service_checker.py`
 ```
 
 **如果服务未启动**:
@@ -356,13 +293,16 @@ curl -k https://localhost:44320/api/health -I
 ### Step 2: 运行 pytest
 
 ```bash
-pytest tests/test_change_password.py -v --alluredir=allure-results
+pytest tests/admin/profile_change_password -m "P0 or P1"
 
 # 测试执行过程:
-# 1. fixtures.py - setup_browser()
+# 1. core/fixtures.py - setup_test_environment()
+#    └─ 清理/准备运行目录（并发安全）
+#
+# 2. core/fixtures.py / conftest.py - auth_page/test_account 等 fixture
 #    └─ 创建 Playwright 浏览器实例
 #
-# 2. fixtures.py - test_account()
+# 3. core/fixtures.py - test_account()
 #    ├─ 清理前：解锁账号、重置状态
 #    ├─ 分配账号：标记 in_use=True
 #    └─ 返回账号信息
@@ -375,7 +315,7 @@ pytest tests/test_change_password.py -v --alluredir=allure-results
 #    ├─ 验证结果
 #    └─ 每个步骤截图（全屏）
 #
-# 4. fixtures.py - cleanup()
+# 4. core/fixtures.py - cleanup()
 #    ├─ 清理后：释放账号、恢复密码
 #    └─ 标记 in_use=False
 ```
@@ -407,14 +347,11 @@ utils/logger.py（日志系统）
 
 ```
 解析 pytest 输出:
-├─ 总测试数: 13
-├─ ✅ 通过: 11 (85%)
-├─ ❌ 失败: 2 (15%)
-│   ├─ test_p1_password_too_short
-│   │   └─ 原因: 后端未启用 RequiredLength 验证规则
-│   └─ test_p1_same_as_current
-│       └─ 原因: 后端未启用"新密码不能与当前相同"规则
-└─ ⏱️  执行时间: 45.3 秒
+├─ 总测试数: N（随页面规则推导结果变化，缺规则会自动 skip）
+├─ ✅ 通过: A
+├─ ❌ 失败: B
+├─ ⏭️  跳过: C（常见原因：缺少可审计的规则/selector，拒绝凭猜）
+└─ ⏱️  执行时间: T（取决于网络、登录复用、截图策略）
 ```
 
 ### Step 4: 生成 Allure 报告
@@ -434,7 +371,7 @@ allure-results/（原始数据）
 ### Step 5: 自动打开报告（必须）✨
 
 ```bash
-allure serve allure-results
+allure open allure-report
 
 # 自动执行:
 # 1. 生成 HTML 报告
@@ -484,49 +421,35 @@ allure serve allure-results
 ```
 Allure Report (HTML)
 ├─ Overview（概览）
-│   ├─ 测试总数: 13
-│   ├─ 通过率: 85%
-│   ├─ 失败率: 15%
-│   ├─ 执行时间: 45.3s
+│   ├─ 测试总数: N
+│   ├─ 通过率: ...
+│   ├─ 失败率: ...
+│   ├─ 执行时间: ...
 │   └─ 优先级分布:
 │       ├─ P0: 4 个（100% 通过）
 │       ├─ P1: 8 个（75% 通过）
 │       └─ P2: 1 个（100% 通过）
 │
 ├─ Suites（测试套件）
-│   └─ TestChangePassword
-│       ├─ ✅ test_p0_page_load
-│       ├─ ✅ test_p0_change_password_success
-│       ├─ ✅ test_p0_current_password_required
-│       ├─ ✅ test_p0_new_password_required
-│       ├─ ❌ test_p1_password_too_short
-│       ├─ ✅ test_p1_password_too_long
-│       ├─ ✅ test_p1_password_missing_uppercase
-│       ├─ ✅ test_p1_password_missing_lowercase
-│       ├─ ✅ test_p1_password_missing_digit
-│       ├─ ✅ test_p1_password_missing_special_char
-│       ├─ ✅ test_p1_passwords_mismatch
-│       ├─ ❌ test_p1_same_as_current
-│       └─ ✅ test_p2_password_visibility
+│   └─ tests/admin/profile_change_password
+│       ├─ ✅ test_profile_change_password_settings_p0.py::test_p0_page_load
+│       ├─ ✅ test_profile_change_password_settings_p0.py::test_p0_happy_path_update_save_with_rollback
+│       ├─ ✅ test_profile_change_password_settings_security.py::test_security_unauth_redirects_to_login
+│       └─ ✅ test_profile_change_password_settings_security.py::test_security_xss_payload_no_dialog
 │
 ├─ Behaviors（功能分组）
 │   ├─ 修改密码
-│   │   ├─ test_p0_change_password_success
-│   │   └─ test_p1_same_as_current
+│   │   └─ ...
 │   ├─ 密码验证
-│   │   ├─ test_p0_current_password_required
-│   │   ├─ test_p0_new_password_required
-│   │   ├─ test_p1_password_too_short
-│   │   ├─ test_p1_password_too_long
 │   │   └─ ...
 │   └─ UI 交互
-│       └─ test_p2_password_visibility
+│       └─ ...
 │
 ├─ Timeline（时间轴）
 │   └─ 显示每个测试的执行时间和并发情况
 │
 └─ Packages（包结构）
-    └─ tests/test_change_password.py
+    └─ tests/admin/profile_change_password/...
 ```
 
 ### 点击测试查看详情
@@ -594,7 +517,7 @@ class BasePage(PageActions, PageWaits, PageUtils):
 - `PageWaits` - 等待策略（智能等待、超时重试）
 - `PageUtils` - 工具函数（截图、验证、错误检测...）
 
-### Fixtures（测试钩子）
+### Fixtures（统一收口的测试生命周期）
 
 ```python
 @pytest.fixture
@@ -613,6 +536,10 @@ def test_account(request):
     success = request.node.rep_call.passed if hasattr(request.node, 'rep_call') else True
     data_manager.cleanup_after_test(test_name, success)
 ```
+
+**统一约束**:
+- ✅ pytest 的生命周期逻辑只允许出现在 `core/fixtures.py` / 根 `conftest.py`（通过 fixture/hook 正式接入）
+- ❌ `utils/` 目录不再承载任何 `pytest_runtest_*`，避免“幽灵 hook”（看起来像生效，实际不会被 pytest 自动加载）
 
 **数据隔离机制**:
 - ✅ 测试前：解锁账号、重置状态
@@ -643,29 +570,28 @@ logger.end(success=True)
 用户输入："帮我测试修改密码页面"
   ↓
 config/project.yaml（配置中心）
-  ├─ 仓库地址（用于 GitHub 分析）
-  ├─ 服务地址（用于 MCP 分析）
+  ├─ 服务地址（用于 Playwright 动态分析与运行）
   └─ 技术栈信息（用于 AI 理解）
   ↓
 .cursor/rules/（AI 规则系统）
   ├─ core/project-overview.md（项目定位）
-  ├─ project-specific/aevatar-station.md（项目规则）
+  ├─ docs/requirements.md（项目独有规则，迁移自 project-specific）
   ├─ workflow/analysis-and-generation.md（分析流程）
   └─ workflow/test-execution.md（执行流程）
   ↓
 generators/（代码生成引擎）
   ├─ page_analyzer.py
-  │   └─ 双重分析 → PageInfo
+  │   └─ Playwright 动态分析 → PageInfo（或读取 --analysis-json）
   ├─ page_object_generator.py
-  │   └─ PageInfo → pages/change_password_page.py
+  │   └─ PageInfo → pages/admin_profile_change_password_page.py
   └─ test_case_generator.py
-      └─ PageInfo → tests/test_change_password.py
+      └─ PageInfo → tests/admin/profile_change_password/...
   ↓
-test-data/accounts.yaml（测试数据）
-  └─ 为每个测试用例分配独立账号
+test-data/test_account_pool.json（测试数据）
+  └─ 为每个测试用例分配/复用测试账号（支持并发锁）
   ↓
 pytest + core/（测试框架）
-  ├─ fixtures.py（测试钩子）
+  ├─ core/fixtures.py（测试钩子）
   ├─ BasePage（页面基类）
   └─ TestLogger（日志系统）
   ↓
@@ -686,13 +612,33 @@ allure serve（生成 HTML）
 
 ### 核心特性
 
-1. **双重分析**（准确性）
-   - GitHub 代码分析（静态）+ Playwright MCP 分析（动态）
-   - 互补 → 最准确的测试用例
+1. **动态分析可审计**（准确性）
+   - Playwright 动态分析 + 可落盘的 DOM/screenshot/a11y 快照（便于复盘）
+   - 若有外部 PageInfo（如 MCP 导出），可用 `--analysis-json` 复用输入，跳过动态分析
 
 2. **全自动化**（零操作）
    - 用户一句话 → 分析 → 生成 → 执行 → 报告（自动打开）
    - 无需任何手动命令
+
+---
+
+## ✅ 官方入口（强制主流程）
+
+本框架把 **页面分析 + 全量生成** 视为默认必选步骤，避免“只跑旧选择器/旧规则/旧用例”的漂移。
+
+### 方式 A：URL 强制入口（推荐用于 CI/一键复现）
+
+```bash
+python3 -m tools.url_flow --url "https://localhost:3000/admin/profile/change-password"
+```
+
+### 方式 B：自然语言路由器（你说一句话就跑全链路）
+
+```bash
+python3 -m tools.ai_command_router 测试下 修改密码页面
+```
+
+别名维护位置：`docs/requirements.md` → “页面别名 → 路由”。
 
 3. **数据隔离**（独立性）
    - 每个测试用例使用独立账号

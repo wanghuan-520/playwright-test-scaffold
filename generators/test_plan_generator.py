@@ -6,7 +6,7 @@
 """
 
 from pathlib import Path
-from generators.page_analyzer import PageInfo
+from generators.page_types import PageInfo
 from generators.test_plan_formatter import TestPlanFormatter
 from generators.test_plan_scenarios import TestPlanScenarios
 from utils.logger import get_logger

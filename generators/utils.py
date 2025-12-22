@@ -77,12 +77,21 @@ def get_page_name_from_url(url: str) -> str:
     Examples:
         "https://example.com/login" -> "Login"
         "https://example.com/user-profile" -> "User Profile"
+        "https://example.com/admin/profile" -> "Admin Profile"
         "https://example.com/" -> "Home"
     """
-    path = url.split("?")[0].rstrip("/")
-    parts = path.split("/")
-    name = parts[-1] if parts[-1] else "home"
-    return name.replace("-", " ").replace("_", " ").title()
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    path = (parsed.path or "/").split("?")[0]
+    segments = [s for s in path.strip("/").split("/") if s]
+    if not segments:
+        return "Home"
+
+    def normalize(seg: str) -> str:
+        return seg.replace("-", " ").replace("_", " ").title()
+
+    return " ".join(normalize(s) for s in segments)
 
 
 def get_file_name_from_url(url: str) -> str:
@@ -92,10 +101,17 @@ def get_file_name_from_url(url: str) -> str:
     Examples:
         "https://example.com/login" -> "login"
         "https://example.com/user-profile" -> "user_profile"
+        "https://example.com/admin/profile" -> "admin_profile"
+        "https://example.com/admin/profile/change-password" -> "admin_profile_change_password"
     """
-    path = url.split("?")[0].rstrip("/")
-    name = path.split("/")[-1] or "home"
-    return to_snake_case(name)
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    path = (parsed.path or "/").split("?")[0]
+    segments = [s for s in path.strip("/").split("/") if s]
+    if not segments:
+        return "home"
+    return to_snake_case("_".join(segments))
 
 
 def get_tc_prefix_from_url(url: str) -> str:

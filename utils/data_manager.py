@@ -12,6 +12,8 @@
 import json
 import os
 import threading
+import fcntl
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Any
 from pathlib import Path
@@ -47,6 +49,27 @@ class DataManager:
         
         self._initialized = True
         logger.info("DataManager 初始化完成")
+
+    @contextmanager
+    def _process_file_lock(self):
+        """
+        进程级文件锁：解决 pytest-xdist 多进程并发读写账号池导致的竞态。
+
+        注意：
+        - threading.RLock 只能保护“同进程多线程”，无法保护“多进程”
+        - 这里用 fcntl.flock 在 macOS/Linux 下提供互斥
+        """
+        lock_path = f"{self.account_pool_path}.lock"
+        os.makedirs(os.path.dirname(lock_path), exist_ok=True)
+        with open(lock_path, "w", encoding="utf-8") as lf:
+            fcntl.flock(lf, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                try:
+                    fcntl.flock(lf, fcntl.LOCK_UN)
+                except Exception:
+                    pass
     
     def _load_account_pool(self) -> Dict[str, Any]:
         """加载账号池数据"""
@@ -162,7 +185,7 @@ class DataManager:
         Returns:
             测试账号信息（username, email, password）
         """
-        with self._account_pool_lock:
+        with self._process_file_lock(), self._account_pool_lock:
             data = self._load_account_pool()
             pool = data.get("test_account_pool", [])
             
@@ -208,30 +231,46 @@ class DataManager:
                     self._save_account_pool(data, lock_acquired=True)
             
             # 再次查找可用账号
-            for account in pool:
-                if not account.get("is_locked", False) and not account.get("in_use", False):
-                    # 标记为使用中
-                    account["in_use"] = True
-                    account["last_used"] = datetime.now().isoformat()
-                    account["test_name"] = test_name
-                    
-                    # 保存账号池（已经持有锁，传入lock_acquired=True）
-                    self._save_account_pool(data, lock_acquired=True)
-                    
-                    # 记录测试用例使用的账号（保存原始密码，用于测试后恢复）
-                    account_copy = account.copy()
-                    # 保存初始密码，用于测试后恢复
-                    if "initial_password" not in account:
-                        account["initial_password"] = account["password"]
-                    account_copy["initial_password"] = account["initial_password"]
-                    self._test_accounts[test_name] = account_copy
-                    
-                    logger.info(f"测试用例 {test_name} 分配账号: {account['username']}")
-                    return {
-                        "username": account["username"],
-                        "email": account["email"],
-                        "password": account["password"]
-                    }
+            # 选择策略：优先选“最久未使用”的账号，避免集中使用同一账号触发后端 lockout
+            def _last_used_key(acc):
+                last_used = acc.get("last_used")
+                if not last_used:
+                    # 从未使用过的账号放到最后（很多项目里账号池可能并非都已注册）
+                    return datetime.max
+                try:
+                    return datetime.fromisoformat(last_used)
+                except Exception:
+                    return datetime.max
+
+            candidates = [
+                acc for acc in pool
+                if not acc.get("is_locked", False) and not acc.get("in_use", False)
+            ]
+            candidates.sort(key=lambda a: (_last_used_key(a), a.get("username", "")))
+
+            for account in candidates:
+                # 标记为使用中
+                account["in_use"] = True
+                account["last_used"] = datetime.now().isoformat()
+                account["test_name"] = test_name
+
+                # 保存账号池（已经持有锁，传入lock_acquired=True）
+                self._save_account_pool(data, lock_acquired=True)
+
+                # 记录测试用例使用的账号（保存原始密码，用于测试后恢复）
+                account_copy = account.copy()
+                # 保存初始密码，用于测试后恢复
+                if "initial_password" not in account:
+                    account["initial_password"] = account["password"]
+                account_copy["initial_password"] = account["initial_password"]
+                self._test_accounts[test_name] = account_copy
+
+                logger.info(f"测试用例 {test_name} 分配账号: {account['username']}")
+                return {
+                    "username": account["username"],
+                    "email": account["email"],
+                    "password": account["password"]
+                }
             
             # 如果还是没有可用账号，抛出异常
             raise RuntimeError(f"没有可用的测试账号，测试用例: {test_name}。总账号数: {len(pool)}, 可用: {len(available_accounts)}")
@@ -246,7 +285,7 @@ class DataManager:
         3. 重置账号状态
         4. 确保账号可用
         """
-        with self._account_pool_lock:
+        with self._process_file_lock(), self._account_pool_lock:
             data = self._load_account_pool()
             pool = data.get("test_account_pool", [])
             
@@ -319,7 +358,7 @@ class DataManager:
             test_name: 测试用例名称
             success: 测试是否成功
         """
-        with self._account_pool_lock:
+        with self._process_file_lock(), self._account_pool_lock:
             if test_name not in self._test_accounts:
                 logger.warning(f"测试用例 {test_name} 没有分配的账号，跳过清理")
                 return
@@ -371,6 +410,31 @@ class DataManager:
             # 保存账号池（已经持有锁，传入lock_acquired=True）
             self._save_account_pool(data, lock_acquired=True)
     
+    def mark_account_locked(self, username: str, reason: str = "") -> bool:
+        """
+        标记账号为不可用（本地账号池层面）。
+        
+        场景：
+        - 账号未在后端注册（Invalid username or password）
+        - 账号被后端 lockout（too many invalid attempts）
+        
+        注意：这里只更新本地账号池状态，不会影响后端账号。
+        """
+        with self._process_file_lock(), self._account_pool_lock:
+            data = self._load_account_pool()
+            pool = data.get("test_account_pool", [])
+            for account in pool:
+                if account.get("username") == username:
+                    account["is_locked"] = True
+                    account["in_use"] = False
+                    account["locked_reason"] = (reason or "")[:300]
+                    self._save_account_pool(data, lock_acquired=True)
+                    logger.warning(
+                        f"账号已标记为不可用: {username} reason={account.get('locked_reason')}"
+                    )
+                    return True
+            return False
+    
     def reset_account_password(self, username: str, new_password: str) -> bool:
         """
         重置账号密码（用于测试后恢复）
@@ -382,7 +446,7 @@ class DataManager:
         Returns:
             是否成功
         """
-        with self._account_pool_lock:
+        with self._process_file_lock(), self._account_pool_lock:
             data = self._load_account_pool()
             pool = data.get("test_account_pool", [])
             
@@ -419,7 +483,7 @@ class DataManager:
         Returns:
             是否成功
         """
-        with self._account_pool_lock:
+        with self._process_file_lock(), self._account_pool_lock:
             data = self._load_account_pool()
             pool = data.get("test_account_pool", [])
             
@@ -450,35 +514,8 @@ class DataManager:
         return self._test_accounts.get(test_name)
 
 
-# ═══════════════════════════════════════════════════════════════
-# Pytest Fixtures
-# ═══════════════════════════════════════════════════════════════
-
-def pytest_runtest_setup(item):
-    """测试用例执行前的钩子 - 数据清洗"""
-    test_name = item.name
-    data_manager = DataManager()
-    data_manager.cleanup_before_test(test_name)
-
-
-def pytest_runtest_teardown(item, nextitem):
-    """测试用例执行后的钩子 - 数据清洗"""
-    test_name = item.name
-    data_manager = DataManager()
-    
-    # 获取测试结果
-    success = True
-    if hasattr(item, 'rep_call') and item.rep_call.failed:
-        success = False
-    
-    data_manager.cleanup_after_test(test_name, success=success)
-
-
-# ═══════════════════════════════════════════════════════════════
-# Pytest Fixture for Test Account
-# ═══════════════════════════════════════════════════════════════
-
-def pytest_runtest_call(item):
-    """测试用例执行时的钩子 - 分配测试账号"""
-    # 这个钩子在 conftest.py 中通过 fixture 实现更优雅
-    pass
+#
+# NOTE:
+# - 本项目的 pytest 生命周期（账号分配/清洗/失败诊断）统一在 `core/fixtures.py` 中实现并由根 `conftest.py` 引入。
+# - 这里曾经放过 pytest hook，但由于 `utils/` 不是 pytest 插件入口，容易产生“看起来生效但实际不生效”的幽灵 hook。
+# - 因此：`utils/data_manager.py` 只保留 DataManager 作为纯工具类，不再承载 pytest hook。

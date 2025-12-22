@@ -5,7 +5,7 @@
 测试用例模板生成器 - 生成特定类型的测试用例模板
 """
 
-from generators.page_analyzer import PageInfo
+from generators.page_types import PageInfo
 from generators.utils import get_tc_prefix_from_url, get_file_name_from_url
 from utils.logger import get_logger
 
@@ -16,12 +16,20 @@ class TestCaseTemplates:
     """测试用例模板生成器"""
 
     def _gen_type_tests(self, page_info: PageInfo, tc: str, file_name: str) -> str:
-        """生成页面类型特定测试"""
-        if page_info.page_type == "LOGIN":
-            return self._login_tests(tc, file_name)
-        elif page_info.page_type == "FORM":
-            return self._form_tests(tc, file_name)
-        return ""
+        """
+        Deprecated.
+
+        本项目已切换为“可直接执行”的多文件套件生成器（见 `generators/test_case_generator.py`）。
+        该模板文件历史上用于生成带 TODO 的骨架代码，会违反当前规则（禁止生成不可运行的 TODO 用例）。
+
+        如果你需要生成可执行用例，请使用：
+        - TestCaseGenerator.generate_test_suite(page_info)
+        - TestCodeGenerator.generate_all(page_info)
+        """
+        raise RuntimeError(
+            "TestCaseTemplates is deprecated (it used to generate TODO skeletons). "
+            "Use TestCaseGenerator/TestCodeGenerator to generate runnable suites."
+        )
     
     def _login_tests(self, tc: str, fn: str) -> str:
         return f'''

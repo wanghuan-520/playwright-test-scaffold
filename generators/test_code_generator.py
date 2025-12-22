@@ -6,11 +6,11 @@
 统一协调 Page Object、测试用例、测试数据的生成
 """
 
-from typing import Dict
+from typing import Dict, Optional
 from pathlib import Path
 import json
 
-from generators.page_analyzer import PageInfo
+from generators.page_types import PageInfo
 from generators.page_object_generator import PageObjectGenerator
 from generators.test_case_generator import TestCaseGenerator
 from generators.test_data_generator import TestDataGenerator
@@ -40,18 +40,26 @@ class TestCodeGenerator:
         output = Path(output_dir)
         files = {}
         file_name = get_file_name_from_url(page_info.url)
+        rules_ctx_path = (Path.cwd() / "reports" / "rules_context.md")
         
         # Page Object
         page_code = self.page_object_gen.generate_page_object(page_info)
         page_file = output / "pages" / f"{file_name}_page.py"
-        self._save(page_file, page_code)
+        self._save(page_file, page_code, rules_ctx_path=rules_ctx_path)
         files["page_object"] = str(page_file)
         
-        # Test Cases
-        test_code = self.test_case_gen.generate_test_cases(page_info)
-        test_file = output / "tests" / f"test_{file_name}.py"
-        self._save(test_file, test_code)
-        files["test_cases"] = str(test_file)
+        # Test Cases (prefer rule-compliant multi-file suite)
+        suite = self.test_case_gen.generate_test_suite(page_info)
+        if suite:
+            for rel_path, content in suite.items():
+                target = output / rel_path
+                self._save(target, content, rules_ctx_path=rules_ctx_path)
+            files["test_cases_suite"] = ", ".join(sorted(suite.keys()))
+        else:
+            test_code = self.test_case_gen.generate_test_cases(page_info)
+            test_file = output / "tests" / f"test_{file_name}.py"
+            self._save(test_file, test_code, rules_ctx_path=rules_ctx_path)
+            files["test_cases"] = str(test_file)
         
         # Test Data
         test_data = self.test_data_gen.generate_test_data(page_info)
@@ -62,9 +70,28 @@ class TestCodeGenerator:
         logger.info(f"代码生成完成: {len(files)} 个文件")
         return files
     
-    def _save(self, file_path: Path, content: str) -> None:
+    def _save(self, file_path: Path, content: str, *, rules_ctx_path: Optional[Path] = None) -> None:
         """保存文件"""
         file_path.parent.mkdir(parents=True, exist_ok=True)
+        if file_path.suffix == ".py" and rules_ctx_path:
+            # ═══════════════════════════════════════════════════════════════
+            # 生成文件头（可追溯本次生成遵循的 rules 上下文）
+            # ═══════════════════════════════════════════════════════════════
+            rel = None
+            try:
+                rel = rules_ctx_path.relative_to(Path.cwd())
+            except Exception:
+                rel = rules_ctx_path
+            header = "\n".join(
+                [
+                    "# ═══════════════════════════════════════════════════════════════",
+                    "# GENERATED FILE - DO NOT EDIT BY HAND",
+                    f"# rules_context: {rel}",
+                    "# ═══════════════════════════════════════════════════════════════",
+                    "",
+                ]
+            )
+            content = header + (content or "")
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(content)
         logger.debug(f"已保存: {file_path}")

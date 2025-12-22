@@ -175,19 +175,47 @@ class ElementExtractor:
     
     def _build_selector(self, locator, tag: str) -> str:
         """构建元素选择器"""
+        def _esc(v: str) -> str:
+            # CSS attribute selector: keep it simple and safe for single quotes
+            return (v or "").replace("\\", "\\\\").replace("'", "\\'")
+
         element_id = locator.get_attribute("id") or ""
         element_name = locator.get_attribute("name") or ""
         element_class = locator.get_attribute("class") or ""
-        
+
+        href = locator.get_attribute("href") or ""
+        aria = locator.get_attribute("aria-label") or ""
+        role = locator.get_attribute("role") or ""
+        typ = locator.get_attribute("type") or ""
+
+        # 优先级：id > 可判定的关键属性（href/aria/type/name）> class > tag
         if element_id:
-            return f"#{element_id}"
-        elif element_name:
-            return f"[name='{element_name}']"
-        elif element_class:
+            return f"#{_esc(element_id)}"
+
+        # link：优先 href，避免生成 a.flex 这类不可区分 selector
+        if tag == "a" and href:
+            return f"a[href='{_esc(href)}']"
+
+        # button：优先 aria-label / type
+        if tag == "button" and aria:
+            return f"button[aria-label='{_esc(aria)}']"
+        if tag == "button" and typ:
+            return f"button[type='{_esc(typ)}']"
+
+        # input/select：优先 name（稳定字段）
+        if element_name:
+            return f"[name='{_esc(element_name)}']"
+
+        # role 兜底：有些组件会用 role 标识
+        if role:
+            return f"[role='{_esc(role)}']"
+
+        # 最后才退化到 class（低质量/易漂移）
+        if element_class:
             first_class = element_class.split()[0] if element_class else ""
             return f"{tag}.{first_class}" if first_class else tag
-        else:
-            return tag
+
+        return tag
     
     def _extract_attributes(self, locator) -> Dict[str, str]:
         """提取元素属性"""

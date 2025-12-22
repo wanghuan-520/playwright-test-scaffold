@@ -12,8 +12,9 @@ AI 驱动的自动化测试脚手架，通过模块化规则实现从分析到�
 ├── generation/           ← 代码生成
 ├── quality/              ← 质量保证
 ├── data/                 ← 数据管理
-└── project-specific/     ← 项目特定规则
 ```
+
+项目特有规则已迁移到：`docs/requirements.md`（不再维护 `.cursor/rules/project-specific/`）。
 
 ## 🚀 使用
 

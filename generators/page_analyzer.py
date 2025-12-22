@@ -1,31 +1,37 @@
 # ═══════════════════════════════════════════════════════════════════
-import re
 # Playwright Test Scaffold - Page Analyzer (Coordinator)
 # ═══════════════════════════════════════════════════════════════════
 """
 页面分析器 - 协调器
-统一协调元素提取器和页面类型检测
+
+职责：
+- 使用 Playwright 打开页面（支持带登录态 storage_state）
+- 提取可交互元素/表单/导航信息
+- 粗略识别页面类型（LOGIN/FORM/SETTINGS/...）
+
+额外（为“可审计的动态分析”服务）：
+- 可选把动态分析产物落盘：DOM、截图、a11y snapshot
+  这类产物等价于你在 Cursor/Playwright MCP 里看到的“动态结构快照”，
+  用于让 CLI 链路也能复现/审阅分析过程。
 """
 
+import re
+import json
+import os
+from dataclasses import asdict
+from pathlib import Path
+from typing import Dict, Optional, Callable, Any
+
 from playwright.sync_api import sync_playwright, Page
-from typing import Dict, Optional
-from generators.page_types import PageElement, PageInfo
+
+from generators.page_types import PageInfo
 from generators.element_extractor import ElementExtractor
 from utils.logger import get_logger
 from utils.config import ConfigManager
-import json
 
 logger = get_logger(__name__)
 
 
-class PageAnalyzer:
-    """页面分析器 - 协调器"""
-    
-    def __init__(self):
-        """初始化元素提取器"""
-        self.extractor = ElementExtractor()
-        self.config = ConfigManager()
-    
 class PageAnalyzer:
     """
     页面分析器
@@ -79,14 +85,26 @@ class PageAnalyzer:
     def __init__(self):
         """初始化分析器"""
         self.config = ConfigManager()
+        self.extractor = ElementExtractor()
     
-    def analyze(self, url: str, auth_callback: callable = None) -> PageInfo:
+    def analyze(
+        self,
+        url: str,
+        auth_callback: Optional[Callable[[Page], None]] = None,
+        storage_state_path: Optional[str] = None,
+        artifacts_dir: Optional[str] = None,
+        headless: bool = True,
+        timeout_ms: int = 60000,
+    ) -> PageInfo:
         """
         分析页面
         
         Args:
             url: 页面URL
             auth_callback: 认证回调函数（如果页面需要登录）
+            storage_state_path: 登录态缓存文件（Playwright storage_state.json）
+            headless: 是否启用无头模式
+            timeout_ms: 页面导航超时（毫秒）
             
         Returns:
             PageInfo: 页面信息
@@ -94,11 +112,20 @@ class PageAnalyzer:
         logger.info(f"开始分析页面: {url}")
         
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            context = browser.new_context(
-                viewport={"width": 1920, "height": 1080},
-                ignore_https_errors=True
-            )
+            browser = p.chromium.launch(headless=headless)
+
+            context_kwargs: Dict = {
+                "viewport": {"width": 1920, "height": 1080},
+                "ignore_https_errors": True,
+            }
+            if storage_state_path:
+                sp = Path(storage_state_path)
+                if sp.exists() and sp.stat().st_size > 0:
+                    context_kwargs["storage_state"] = str(sp)
+                else:
+                    logger.warning(f"storage_state 不存在或为空: {storage_state_path}（将以未登录态分析）")
+
+            context = browser.new_context(**context_kwargs)
             page = context.new_page()
             
             try:
@@ -107,8 +134,11 @@ class PageAnalyzer:
                     auth_callback(page)
                 
                 # 导航到页面
-                page.goto(url, wait_until="networkidle", timeout=30000)
+                page.goto(url, wait_until="networkidle", timeout=timeout_ms)
                 page.wait_for_timeout(2000)
+
+                # 可选：落盘动态分析产物（便于审计/复盘）
+                self._dump_artifacts(page, url=url, artifacts_dir=artifacts_dir)
                 
                 # 分析页面
                 page_info = self._analyze_page(page, url)
@@ -118,6 +148,70 @@ class PageAnalyzer:
                 
             finally:
                 browser.close()
+
+    # ═══════════════════════════════════════════════════════════════
+    # Artifacts (dynamic snapshot)
+    # ═══════════════════════════════════════════════════════════════
+
+    def _dump_artifacts(self, page: Page, *, url: str, artifacts_dir: Optional[str]) -> None:
+        """
+        将动态分析的关键证据落盘，避免“黑盒分析”。
+
+        产物：
+        - dom.html: 当前页面 DOM
+        - screenshot.png: 当前页面截图
+        - a11y.json: Playwright accessibility snapshot（结构化）
+
+        注意：
+        - 任何落盘失败都不应影响测试生成主流程（记录 warning 即可）。
+        """
+        if not artifacts_dir:
+            return
+
+        try:
+            out_dir = Path(artifacts_dir).expanduser()
+            out_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            logger.warning(f"创建 artifacts_dir 失败: {artifacts_dir} err={e}")
+            return
+
+        def _safe_write_text(name: str, text: str) -> None:
+            try:
+                (out_dir / name).write_text(text or "", encoding="utf-8")
+            except Exception as e:
+                logger.warning(f"写入 {name} 失败: {e}")
+
+        def _safe_write_json(name: str, obj: Any) -> None:
+            try:
+                (out_dir / name).write_text(json.dumps(obj, indent=2, ensure_ascii=False), encoding="utf-8")
+            except Exception as e:
+                logger.warning(f"写入 {name} 失败: {e}")
+
+        try:
+            _safe_write_text("url.txt", (url or "") + "\n")
+            _safe_write_text("title.txt", (page.title() or "") + "\n")
+        except Exception:
+            pass
+
+        # DOM
+        try:
+            _safe_write_text("dom.html", page.content())
+        except Exception as e:
+            logger.warning(f"导出 DOM 失败: {e}")
+
+        # Screenshot
+        try:
+            page.screenshot(path=str(out_dir / "screenshot.png"), full_page=True)
+        except Exception as e:
+            logger.warning(f"导出截图失败: {e}")
+
+        # Accessibility snapshot
+        try:
+            a11y = page.accessibility.snapshot()
+            _safe_write_json("a11y.json", a11y)
+        except Exception as e:
+            # 某些页面/浏览器版本可能不支持或会抛异常
+            logger.warning(f"导出 a11y snapshot 失败: {e}")
     
     def _analyze_page(self, page: Page, url: str) -> PageInfo:
         """
@@ -139,10 +233,10 @@ class PageAnalyzer:
         elements = self.extractor._get_elements(page)
         
         # 获取表单信息
-        forms = self._get_forms(page)
+        forms = self.extractor._get_forms(page)
         
         # 获取导航信息
-        navigation = self._get_navigation(page)
+        navigation = self.extractor._get_navigation(page)
         
         return PageInfo(
             url=url,

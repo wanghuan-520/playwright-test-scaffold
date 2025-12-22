@@ -9,6 +9,7 @@ from playwright.sync_api import Page
 from abc import ABC, abstractmethod
 from typing import Optional
 from datetime import datetime
+import os
 from core.page_actions import PageActions
 from core.page_waits import PageWaits
 from core.page_utils import PageUtils
@@ -46,19 +47,6 @@ class BasePage(ABC, PageActions, PageWaits):
         pass
     
     # ═══════════════════════════════════════════════════════════════
-    # NAVIGATION
-    # ═══════════════════════════════════════════════════════════════
-    
-    def navigate(self) -> None:
-        """导航到页面 - 子类必须实现"""
-        pass
-    
-    @abstractmethod
-    def is_loaded(self) -> bool:
-        """检查页面是否加载完成 - 子类必须实现"""
-        pass
-    
-    # ═══════════════════════════════════════════════════════════════
     # NAVIGATION METHODS
     # ═══════════════════════════════════════════════════════════════
     
@@ -86,7 +74,9 @@ class BasePage(ABC, PageActions, PageWaits):
             timeout: 超时时间(毫秒)
         """
         logger.debug(f"等待页面加载: {self.__class__.__name__}")
-        self.page.wait_for_load_state("networkidle", timeout=timeout)
+        # 可配置的 load_state（默认 networkidle；需要提速可用 domcontentloaded）
+        load_state = os.getenv("WAIT_FOR_LOAD_STATE", "networkidle").strip() or "networkidle"
+        self.page.wait_for_load_state(load_state, timeout=timeout)
         
         # 等待页面标识元素
         if self.page_loaded_indicator:

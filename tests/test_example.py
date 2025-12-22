@@ -8,6 +8,10 @@
 运行命令:
     pytest tests/test_example.py -v
     pytest tests/test_example.py -v -m P0
+
+注意：
+- 本文件是“示例”，不应混入实际业务页面的 P0/P1/P2 回归集合。
+- 因此这里的用例统一使用 `example` 标记，而不是 P0/P1/P2。
 """
 
 import pytest
@@ -45,7 +49,7 @@ class TestExample:
     # P0 TESTS - 核心功能测试
     # ═══════════════════════════════════════════════════════════════
     
-    @pytest.mark.P0
+    @pytest.mark.example
     @pytest.mark.functional
     @allure.story("页面加载")
     @allure.title("TC-EX-001: 页面加载验证")
@@ -95,7 +99,7 @@ class TestExample:
     # P1 TESTS - 重要功能测试
     # ═══════════════════════════════════════════════════════════════
     
-    @pytest.mark.P1
+    @pytest.mark.example
     @pytest.mark.validation
     @allure.story("输入验证")
     @allure.title("TC-EX-101: 空值输入验证")
@@ -127,7 +131,7 @@ class TestExample:
         
         logger.end(success=True)
     
-    @pytest.mark.P1
+    @pytest.mark.example
     @pytest.mark.boundary
     @allure.story("边界测试")
     @allure.title("TC-EX-102: 超长输入测试")
@@ -161,7 +165,7 @@ class TestExample:
     # P2 TESTS - 一般功能测试
     # ═══════════════════════════════════════════════════════════════
     
-    @pytest.mark.P2
+    @pytest.mark.example
     @pytest.mark.ui
     @allure.story("UI验证")
     @allure.title("TC-EX-201: UI样式验证")
@@ -188,7 +192,7 @@ class TestExample:
         
         logger.end(success=True)
     
-    @pytest.mark.P2
+    @pytest.mark.example
     @pytest.mark.ui
     @allure.story("UI验证")
     @allure.title("TC-EX-202: 键盘导航测试")

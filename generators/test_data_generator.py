@@ -15,12 +15,12 @@ Allure 报告增强：
 - allure.attach() - 预期目标附件
 """
 
-from typing import Dict
+from typing import Dict, Optional
 from pathlib import Path
 from datetime import datetime
 import json
 
-from generators.page_analyzer import PageInfo, PageElement
+from generators.page_types import PageInfo, PageElement
 from generators.utils import (
     to_snake_case,
     to_class_name,
@@ -35,6 +35,22 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+
+
+def _safe_int(v: object) -> Optional[int]:
+    try:
+        if v is None:
+            return None
+        n = int(str(v).strip())
+        return n if n > 0 else None
+    except Exception:
+        return None
+
+
+def _infer_max_len(elem: PageElement) -> Optional[int]:
+    """从 DOM attributes 推测 maxlength（若存在）。"""
+    attrs = elem.attributes or {}
+    return _safe_int(attrs.get("maxlength") or attrs.get("maxLength") or attrs.get("data-maxlength"))
 
 
 class TestDataGenerator:
@@ -55,17 +71,19 @@ class TestDataGenerator:
             
             field = elem.name or elem.id or "field"
             input_type = elem.attributes.get("type", "text")
+            max_len = _infer_max_len(elem)
             
             type_data = {
                 "email": {
                     "valid": "test@example.com",
                     "invalid": "invalid-email",
-                    "boundary": {"min": "a@b.c", "max": "a" * 50 + "@example.com"},
+                    # 默认不制造“超长”，仅贴合 maxlength（或给一个合理上限）
+                    "boundary": {"min": "a@b.c", "max": None},
                 },
                 "password": {
                     "valid": "ValidPass123!",
                     "invalid": "123",
-                    "boundary": {"min": "a", "max": "a" * 100},
+                    "boundary": {"min": "a", "max": None},
                 },
                 "tel": {
                     "valid": "13800138000",
@@ -82,10 +100,22 @@ class TestDataGenerator:
             default = {
                 "valid": "test_value",
                 "invalid": "",
-                "boundary": {"empty": "", "min": "a", "max": "x" * 256, "special": "@#$%^&*()"},
+                # 正常 case 用正常长度；边界也默认只到“合理 max”
+                "boundary": {"empty": "", "min": "a", "max": None, "special": "@#$%^&*()"},
             }
             
             field_data = type_data.get(input_type, default)
+            boundary = field_data.get("boundary")
+            if isinstance(boundary, dict) and boundary.get("max") is None:
+                cap = max_len or 64
+                if input_type == "email":
+                    suffix = "@t.com"
+                    local_len = max(1, cap - len(suffix))
+                    if max_len is None:
+                        local_len = min(local_len, 48)
+                    boundary["max"] = ("a" * local_len) + suffix
+                else:
+                    boundary["max"] = "x" * cap
             data["valid_data"][field] = field_data["valid"]
             data["invalid_data"][field] = field_data["invalid"]
             data["boundary_data"][field] = field_data["boundary"]

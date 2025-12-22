@@ -3,8 +3,8 @@
 > **AI 驱动的 Playwright 自动化测试脚手架** - 用自然语言生成测试，全自动执行
 
 [![架构健康度](https://img.shields.io/badge/架构健康度-93%2F100-brightgreen)](docs/architecture.md)
-[![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
-[![Playwright](https://img.shields.io/badge/Playwright-1.40+-green.svg)](https://playwright.dev/)
+[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
+[![Playwright](https://img.shields.io/badge/Playwright-1.49+-green.svg)](https://playwright.dev/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
@@ -33,11 +33,11 @@ AI 自动完成：页面分析 → 代码生成 → 测试执行 → 报告打�
 |------|------|
 | 🧹 **自动清理** | 每次测试前自动清理旧数据（报告、截图、结果） |
 | 🔐 **数据隔离** | 每个测试用例使用独立账号，自动分配、清理、恢复 |
-| 📸 **全屏截图** | 所有关键步骤自动全屏截图，附加到 Allure 报告 |
+| 📸 **关键步骤截图** | 所有关键步骤自动截图（默认视口，必要时可切全页），附加到 Allure 报告 |
 | ⚡ **智能等待** | 所有操作自动等待元素可见、可点击，无需手动 sleep |
 | 🩺 **服务检查** | 测试前自动检查服务状态，未启动时智能等待 |
 | 📊 **Allure 报告** | 自动生成并打开 HTML 报告，浏览器自动弹出 |
-| 🎨 **代码美学** | 所有文件 ≤400 行，遵循 SOLID 原则，清晰易维护 |
+| 🎨 **可维护性** | 倾向小文件与清晰分层（以易读/可检证为先），并持续把复杂逻辑拆分到职责单一的模块 |
 
 ---
 
@@ -47,12 +47,12 @@ AI 自动完成：页面分析 → 代码生成 → 测试执行 → 报告打�
 
 ```bash
 # 创建虚拟环境
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate  # Linux/Mac
 
 # 安装依赖
-pip install -r requirements.txt
-playwright install chromium
+python3 -m pip install -r requirements.txt
+python3 -m playwright install chromium
 
 # 安装 Allure（用于报告）
 # Mac
@@ -66,73 +66,53 @@ sudo apt-get install allure
 
 ### 2. 配置项目
 
-编辑 `config/project.yaml`：
+编辑 `config/project.yaml`（建议从 `config/project.yaml.example` 复制一份再改）：
 
 ```yaml
-# ═══════════════════════════════════════════════════════════════
-# 项目基本信息
-# ═══════════════════════════════════════════════════════════════
-project_name: "Aevatar Agent Station"
-description: "AI Agent 管理平台"
+project:
+  name: "Aevatar Agent Station"
+  description: "AI Agent 管理平台"
+  version: "1.0.0"
 
-# ═══════════════════════════════════════════════════════════════
-# GitHub 仓库配置（用于代码分析）
-# ═══════════════════════════════════════════════════════════════
 repositories:
   frontend:
-    url: "https://github.com/your-org/frontend"
+    local_path: "/path/to/your/frontend"   # 建议配置，便于静态分析
+    url: ""                                # 可选
     branch: "main"
   backend:
-    url: "https://github.com/your-org/backend"
+    local_path: "/path/to/your/backend"    # 建议配置，便于静态分析
+    url: ""                                # 可选
     branch: "main"
 
-# ═══════════════════════════════════════════════════════════════
-# 服务地址配置
-# ═══════════════════════════════════════════════════════════════
-services:
-  frontend:
-    url: "https://localhost:3000"
-    health_check: "/"
-  backend:
-    url: "https://localhost:44320"
-    health_check: "/api/health"
-
-# ═══════════════════════════════════════════════════════════════
-# 技术栈信息（用于 AI 理解）
-# ═══════════════════════════════════════════════════════════════
-tech_stack:
-  frontend:
-    framework: "Next.js"
-    version: "15.1.6"
-    language: "TypeScript"
-    ui_library: "React"
-  backend:
-    framework: "ABP Framework"
-    version: "8.3"
-    language: ".NET"
-    runtime: ".NET Aspire"
+environments:
+  default: "dev"
+  dev:
+    frontend:
+      url: "https://localhost:3000"
+      health_check: "/"
+    backend:
+      url: "https://localhost:44320"
+      health_check: "/api/health"
 
 # ═══════════════════════════════════════════════════════════════
 # 测试数据配置
 # ═══════════════════════════════════════════════════════════════
 test_data:
   accounts:
-    path: "test-data/accounts.yaml"
+    path: "test-data/test_account_pool.json"
 ```
 
 ### 3. 准备测试数据
 
-编辑 `test-data/accounts.yaml`：
+编辑 `test-data/test_account_pool.json`（示例格式）：
 
-```yaml
-test_accounts:
-  - username: "testuser01"
-    email: "testuser01@example.com"
-    password: "Test123456!"
-    
-  - username: "testuser02"
-    email: "testuser02@example.com"
-    password: "Test123456!"
+```json
+{
+  "test_account_pool": [
+    { "username": "testuser01", "email": "testuser01@example.com", "password": "Test123456!" },
+    { "username": "testuser02", "email": "testuser02@example.com", "password": "Test123456!" }
+  ]
+}
 ```
 
 ### 4. 与 AI 对话开始测试
@@ -170,16 +150,110 @@ AI 将**全自动完成**：
 
 ---
 
+## 🧭 入口选择（建议从这里开始）
+
+本项目有 3 个“官方入口”，按使用场景选择即可：
+
+| 入口 | 什么时候用 | 做了什么 |
+|------|------------|----------|
+| `python3 -m tools.url_flow --url "<url>" -- <pytest_args...>` | **推荐默认**：测试某个页面/功能 | 强制走 **分析→全量生成→pytest→allure generate** |
+| `python3 -m tools.ai_command_router <一句话/URL> -- <pytest_args...>` | 想“一句话就跑起来” | 解析 URL/别名 → 调 `url_flow`；或识别“回归/全系统”→ 直接跑 `pytest`；最后用 `http.server` 打开报告 |
+| `python3 -m tools.test_flow --suite <key> -- <pytest_args...>` | 多目录分开跑、但希望总报告展示“各目录最后一次” | suite 结果缓存 + 合并结果 + 生成/打开报告 |
+
+常用示例：
+
+```bash
+# 页面级全链路（推荐）
+python3 -m tools.url_flow --url "https://localhost:3000/admin/profile/change-password"
+
+# 自然语言（会从 docs/requirements.md 解析“页面别名 → 路由”）
+python3 -m tools.ai_command_router 测试下 修改密码页面
+
+# 透传 pytest 参数（示例：只跑 P0/P1，并发 4）
+python3 -m tools.ai_command_router 测试下 修改密码页面 -- -m "P0 or P1" -n 4
+```
+
+### 🧩 多目录运行：希望“之前的报告还在”（合并各目录最后一次结果）
+
+如果你要先跑 `tests/admin/profile`，再跑 `tests/admin/profile_change_password`，并希望最终报告里同时保留两者（各自最后一次），请用：
+
+```bash
+# 第一次：跑 profile（suite 自动从目标路径推断为 profile）
+python3 -m tools.test_flow -- tests/admin/profile
+
+# 第二次：跑 profile_change_password（suite 自动推断）
+python3 -m tools.test_flow -- tests/admin/profile_change_password
+```
+
+> 机制：每次运行把结果写到 `.allure-cache/<suite>/allure-results`（覆盖该 suite 的旧结果），再把所有 suite 的最新结果合并生成一个总 `allure-report`。
+
+---
+
 ## 📖 对话指令示例
 
 | 指令类型 | 示例 | 说明 |
 |----------|------|------|
 | **测试页面** | "帮我测试修改密码页面" | 完整自动化流程 ⭐ |
 | **指定 URL** | "测试 /admin/profile/change-password" | 精确指定页面 |
-| **只生成代码** | "生成登录页面的测试代码" | 不运行测试 |
-| **单独运行测试** | "运行测试" | 跳过分析和生成 |
+| **复跑/调试** | "运行测试" | 用于复跑已有套件（调试用）；主流程仍建议先分析+生成 |
 | **查看报告** | "打开 Allure 报告" | 打开已有报告 |
 | **修复问题** | "test_p0_login 失败了，帮我修复" | AI 自动分析并修复 |
+
+---
+
+## ✅ 官方“必选”流程：URL → 分析 → 全量生成 → 执行 → 报告
+
+为了避免“只跑旧代码/旧选择器/旧规则”的漂移，本框架把 **页面分析 + 全量生成** 视为默认必选步骤。
+
+你也可以直接用命令行强制走全链路（推荐用于 CI/本地一键复现）：
+
+```bash
+python3 -m tools.url_flow --url "https://localhost:3000/admin/profile/change-password"
+
+# 透传 pytest 参数（示例：只跑 P0/P1，并发 4）
+python3 -m tools.url_flow --url "https://localhost:3000/admin/profile/change-password" -- -m "P0 or P1" -n 4
+```
+
+---
+
+## 🗣️ 一句话触发全流程（命令路由器）
+
+如果你希望输入自然语言就自动跑完整链路（分析→生成→执行→报告并打开），用：
+
+```bash
+python3 -m tools.ai_command_router 测试下 修改密码页面
+
+# 或者直接给 URL
+python3 -m tools.ai_command_router 测试下 https://localhost:3000/admin/profile/change-password
+
+# 透传 pytest 参数
+python3 -m tools.ai_command_router 测试下 修改密码页面 -- -m "P0 or P1" -n 4
+```
+
+页面别名映射维护在：`docs/requirements.md` → “页面别名 → 路由”。
+
+---
+
+## ⚙️ 配置与常用开关（高频）
+
+### 配置中心：`config/project.yaml`
+
+你通常只需要关心：
+- **环境选择**：`environments.default`（或设置环境变量 `TEST_ENV`）
+- **服务地址**：`environments.<env>.frontend/backend.url`
+- **账号池路径**：`test_data.accounts.path`（默认 `test-data/test_account_pool.json`）
+
+### 常用环境变量
+
+| 环境变量 | 作用 |
+|---------|------|
+| `TEST_ENV=dev` | 选择运行环境（默认取 `environments.default`） |
+| `REUSE_LOGIN=1` | 并发/高频运行建议开启：每个 xdist worker 复用登录态 `storage_state`，更快且降低 lockout 风险 |
+| `PRECHECK_ACCOUNTS=1` | 运行前预检账号池（建议与 `REUSE_LOGIN=1` 搭配） |
+| `PRECHECK_NEED=4` | 预检期望的可用账号数量，不足可 fail-fast |
+| `PERSONAL_SETTINGS_PATH=/admin/profile` | 登录态可用性判定路径（影响预检/worker 登录态生成） |
+| `KEEP_ALLURE_HISTORY=1` | 清理目录时保留 `allure-results/history`（趋势） |
+| `APPEND_ALLURE_RESULTS=1` | 追加模式：不清空 `allure-results/`、`screenshots/`、`allure-report/`（适合分段跑后汇总） |
 
 ---
 
@@ -279,8 +353,6 @@ playwright-test-scaffold/
 ├── .cursor/rules/              # AI 规则系统（模块化）
 │   ├── core/                   # 核心规则
 │   │   └── project-overview.md
-│   ├── project-specific/        # 项目特定规则
-│   │   └── aevatar-station.md  # Aevatar 项目规则
 │   ├── workflow/               # 工作流规则
 │   │   ├── analysis-and-generation.md
 │   │   ├── test-execution.md
@@ -317,11 +389,12 @@ playwright-test-scaffold/
 ├── pages/                       # Page Objects（生成）
 ├── tests/                       # 测试用例（生成）
 ├── test-data/                   # 测试数据
-│   └── accounts.yaml           # 测试账号池
+│   └── test_account_pool.json  # 测试账号池
 │
 ├── docs/                        # 文档
 │   ├── architecture.md         # 架构文档
 │   └── test-workflow.md        # 测试流程详解
+│   └── requirements.md         # 项目独有规则（迁移自 .cursor/rules/project-specific）
 │
 ├── allure-results/              # Allure 原始数据
 ├── allure-report/               # Allure HTML 报告
@@ -385,14 +458,32 @@ mkdir screenshots/
 
 **确保每次测试都是干净的开始，报告和截图只显示本次测试结果！** ✨
 
+### 默认不跑示例用例（避免回归被 demo 影响）
+
+`tests/test_example.py` 仅用于演示，默认已从回归集合排除（`pytest.ini` 默认 `-m "not example"`）。
+
+- 跑回归（默认）：`pytest`
+- 单独跑示例：`pytest -m example tests/test_example.py`
+
+### Allure 报告打开（最稳方式）
+
+在部分环境里 `allure open/serve` 可能因为进程资源/端口等原因启动失败；推荐用静态服务打开：
+
+```bash
+allure generate -c allure-results -o allure-report
+python3 -m http.server 59717 --bind 127.0.0.1 --directory "allure-report"
+```
+
+打开：`http://127.0.0.1:59717/`
+
 ### 截图规范
 
-所有关键步骤自动全屏截图：
+所有关键步骤自动截图（默认视口；需要全页审计时开启 `FULL_PAGE_SHOT=1`）：
 
 ```python
-# ✅ 正确：全屏截图，附加到 Allure
+# ✅ 正确：关键步骤截图，附加到 Allure
 with allure.step("导航到修改密码页面"):
-    page_obj.take_screenshot("step_navigate", full_page=True)
+    page_obj.take_screenshot("step_navigate", full_page=False)
 
 # ✅ 正确：等待 toast 出现后再截图
 page_obj.click_save()
@@ -407,7 +498,7 @@ for selector in [".toast", ".Toastify__toast", "[role='alert']"]:
         continue
 
 with allure.step("点击保存按钮"):
-    page_obj.take_screenshot("step_click_save", full_page=True)
+    page_obj.take_screenshot("step_click_save", full_page=False)
 ```
 
 ---
@@ -441,7 +532,7 @@ pytest -m "not P2"
 
 ```bash
 # AI 自动执行（无需手动）
-allure serve allure-results
+allure open allure-report
 
 # 效果：
 # 1. 自动生成 HTML 报告
@@ -490,7 +581,7 @@ allure serve allure-results
 | 必须包含特殊字符 | `RequireNonAlphanumeric` | `test_p1_password_missing_special_char` |
 | 唯一字符数要求 | `RequiredUniqueChars` | `test_p1_password_insufficient_unique_chars` |
 
-详细规则：[.cursor/rules/project-specific/aevatar-station.md](.cursor/rules/project-specific/aevatar-station.md)
+项目独有规则：`docs/requirements.md`
 
 ---
 
@@ -533,7 +624,7 @@ refactor(utils): 简化 ServiceChecker 逻辑
 | [架构设计](docs/architecture.md) | 完整的架构说明、设计模式、模块职责 |
 | [测试流程](docs/test-workflow.md) | 详细的测试流程图、数据流转 |
 | [规则系统](.cursor/rules/README.md) | AI 规则系统的模块化管理 |
-| [项目规则](.cursor/rules/project-specific/aevatar-station.md) | Aevatar 项目特定规则 |
+| 项目规则 | `docs/requirements.md` | Aevatar 项目特定规则 |
 
 ---
 

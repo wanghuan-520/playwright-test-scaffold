@@ -20,7 +20,7 @@ from pathlib import Path
 from datetime import datetime
 import json
 
-from generators.page_analyzer import PageInfo, PageElement
+from generators.page_types import PageInfo, PageElement
 from generators.utils import (
     to_snake_case,
     to_class_name,
@@ -39,6 +39,17 @@ logger = get_logger(__name__)
 
 class TestPlanFormatter:
     """测试计划格式化器"""
+
+    def _infer_max_len(self, elem: PageElement):
+        # DOM attributes 可能来自不同风格：maxlength / maxLength
+        try:
+            v = elem.attributes.get("maxlength") or elem.attributes.get("maxLength") or elem.attributes.get("data-maxlength")
+            if v is None:
+                return None
+            n = int(str(v).strip())
+            return n if n > 0 else None
+        except Exception:
+            return None
 
     def _header(self, page_info: PageInfo) -> str:
         """文档头部"""
@@ -110,15 +121,22 @@ class TestPlanFormatter:
         for elem in inputs:
             field = elem.name or elem.id or "field"
             attr_type = elem.attributes.get("type", "text")
+            max_len = self._infer_max_len(elem)
             
             if attr_type == "email":
                 valid[field] = "test@example.com"
                 invalid[field] = "invalid-email"
-                boundary[field] = "a@b.c"
+                # 边界示例：尽量贴合 maxlength；未推导时给一个“正常偏长”的样例即可
+                cap = max_len or 64
+                suffix = "@t.com"
+                local_len = max(1, cap - len(suffix))
+                if max_len is None:
+                    local_len = min(local_len, 48)
+                boundary[field] = ("a" * local_len) + suffix
             elif attr_type == "password":
                 valid[field] = "ValidPass123!"
                 invalid[field] = "123"
-                boundary[field] = "a" * 100
+                boundary[field] = "a" * (max_len or 64)
             elif attr_type == "tel":
                 valid[field] = "13800138000"
                 invalid[field] = "abc"
@@ -126,7 +144,8 @@ class TestPlanFormatter:
             else:
                 valid[field] = "test_value"
                 invalid[field] = ""
-                boundary[field] = "x" * 256
+                # 不默认写超长；优先用 maxlength，否则 64
+                boundary[field] = "x" * (max_len or 64)
         
         return f"""## 4. Test Data Design
 
@@ -259,7 +278,7 @@ pytest tests/test_{file_name}.py -v -m P0
 
 # 生成 Allure 报告
 pytest tests/test_{file_name}.py --alluredir=allure-results
-allure serve allure-results
+allure open allure-report
 ```
 
 ### 6.3 Allure 报告增强

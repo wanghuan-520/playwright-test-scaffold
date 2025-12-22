@@ -40,3 +40,44 @@ class PageInfo:
     navigation: List[Dict] = field(default_factory=list)
 
 
+# ═══════════════════════════════════════════════════════════════
+# JSON helpers (for MCP/CLI bridge)
+# ═══════════════════════════════════════════════════════════════
+
+
+def page_element_from_dict(d: Dict[str, Any]) -> PageElement:
+    """
+    从 dict 反序列化 PageElement。
+    允许字段缺失：用默认值兜底，避免“格式升级”导致历史快照不可用。
+    """
+    return PageElement(
+        selector=str(d.get("selector") or ""),
+        tag=str(d.get("tag") or ""),
+        type=str(d.get("type") or ""),
+        text=str(d.get("text") or ""),
+        placeholder=str(d.get("placeholder") or ""),
+        name=str(d.get("name") or ""),
+        id=str(d.get("id") or ""),
+        role=str(d.get("role") or ""),
+        required=bool(d.get("required") or False),
+        disabled=bool(d.get("disabled") or False),
+        attributes=dict(d.get("attributes") or {}),
+    )
+
+
+def page_info_from_dict(d: Dict[str, Any]) -> PageInfo:
+    """
+    从 dict 反序列化 PageInfo。
+    """
+    elements_raw = d.get("elements") or []
+    elements = [page_element_from_dict(x) for x in elements_raw if isinstance(x, dict)]
+    return PageInfo(
+        url=str(d.get("url") or ""),
+        title=str(d.get("title") or ""),
+        page_type=str(d.get("page_type") or "FORM"),
+        elements=elements,
+        forms=list(d.get("forms") or []),
+        navigation=list(d.get("navigation") or []),
+    )
+
+

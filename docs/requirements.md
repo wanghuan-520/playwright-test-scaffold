@@ -1,7 +1,3 @@
----
-alwaysApply: true
----
-
 # 项目特定规则 - Aevatar Agent Station
 
 ## 📋 项目框架性质
@@ -153,3 +149,16 @@ def test_p1_password_too_short(self, page, test_account):
 ---
 
 **✨ 当不确定如何补充测试用例时，始终参照后端 ABP 框架的限制。**
+
+---
+
+## 🗺️ 页面别名 → 路由（给命令路由器/AI 用）
+
+说明：
+- **用途**：让你说“测试下修改密码页面”这种自然语言时，路由器能稳定映射到实际 URL。
+- **维护方式**：新增页面时在这里加一行；别名可以写多个（用 `,` / `，` / `、` 分隔）。
+
+| 别名（alias） | path（相对前端 base url） | 说明 |
+|---|---|---|
+| 修改密码页面, Change Password | /admin/profile/change-password | 个人设置-修改密码 |
+| 个人设置页面, Personal Settings | /admin/profile | 个人设置-基本信息 |

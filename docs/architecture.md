@@ -4,26 +4,28 @@
 
 ## 使用方式
 
-**本项目只通过 AI 对话交互**，用自然语言描述需求，AI 自动完成：
-- 检查服务状态
-- **分析 GitHub 代码** - 根据页面 URL 查找对应代码，提取功能点
-- 生成 Page Object
-- 生成测试用例（覆盖所有分析出的功能点）
-- 执行测试
-- 查看报告
+本项目的核心是 **“URL → 动态分析 → 全量生成 → 执行 → 报告”** 的可复现链路。
+
+你可以用自然语言（`tools/ai_command_router.py`）或直接用 CLI（`tools/url_flow.py`）触发，框架会自动完成：
+- 检查/复用登录态（`storage_state`）
+- **Playwright 动态分析**（`generators/page_analyzer.py`）：真实打开页面，提取元素/可访问性快照（可选落盘）
+- 生成 Page Object（`pages/*_page.py`）
+- 生成测试套件（`tests/**`，含 P0/P1/P2/security 等）
+- 执行 pytest（默认只跑该 URL 对应套件目录）
+- 生成 Allure 报告（可选）
 
 ## 页面功能分析流程
 
 ```
-页面 URL → 推断代码位置 → DeepWiki 查询代码 → 提取功能点 → 生成测试
+页面 URL → Playwright 动态分析 → PageInfo → 代码生成（PO + tests + test-data）
 ```
 
 | 分析维度 | 关注点 |
 |----------|--------|
 | 表单字段 | 输入框、下拉框、必填/可选 |
-| 验证规则 | 正则、长度限制、格式要求 |
-| API 接口 | 请求方法、参数、响应 |
-| 业务逻辑 | 条件判断、流程分支 |
+| 选择器 | role/name/id/name 属性、可见性、可交互性 |
+| 请求行为 | 点击保存等动作是否触发写请求、是否出现 5xx/错误 UI |
+| 规则推导 | 规则缺失时 **自动跳过**（拒绝凭猜生成边界矩阵） |
 
 ## 目录结构
 
@@ -32,6 +34,11 @@ playwright-test-scaffold/
 ├── conftest.py                   # pytest 根配置
 ├── pytest.ini                    # pytest 配置
 ├── requirements.txt              # 依赖清单
+│
+├── tools/                        # 官方可执行入口（强制走完整流程）
+│   ├── __init__.py
+│   ├── url_flow.py               # URL → 分析 → 全量生成 → pytest → allure
+│   └── ai_command_router.py      # 自然语言/URL → url_flow → 自动打开 Allure
 │
 ├── config/
 │   └── project.yaml              # 项目配置中心（仓库/服务/数据）
@@ -58,7 +65,7 @@ playwright-test-scaffold/
 │   │   ├── test_code_generator.py      # 测试代码生成器（协调器）
 │   │   ├── page_object_generator.py    # Page Object 生成器
 │   │   ├── test_case_generator.py      # 测试用例生成器
-│   │   ├── test_case_templates.py      # 测试用例模板
+│   │   ├── test_case_templates.py      # DEPRECATED: 历史遗留 TODO 模板（禁止作为生成路径）
 │   │   └── test_data_generator.py      # 测试数据生成器
 │   │
 │   ├── 文档生成层
@@ -73,6 +80,8 @@ playwright-test-scaffold/
 │   ├── __init__.py
 │   ├── config.py                 # 配置管理器（单例模式）
 │   ├── logger.py                 # 日志系统
+│   ├── rules_loader.py           # 规则上下文加载器（.cursor/rules → reports/rules_context.md）
+│   ├── rules_engine.py           # 可执行规则引擎（docs/rules.yaml → RulesConfig）
 │   └── service_checker.py        # 服务健康检查
 │
 ├── pages/                        # Page Object 实现层（生成）
@@ -87,6 +96,7 @@ playwright-test-scaffold/
 │
 ├── docs/                         # 文档
 │   ├── architecture.md           # 本文档
+│   ├── rules.yaml                # 可执行规则（生成/执行的结构化配置源）
 │   └── test-plans/               # 生成的测试计划
 │
 ├── reports/                      # 测试报告
@@ -212,14 +222,12 @@ playwright-test-scaffold/
 ##### `generators/test_case_generator.py` (测试用例生成器)
 - **职责**: 生成测试用例代码
 - **方法**: `generate_test_cases()` - 生成测试用例代码
-- **依赖**: `TestCaseTemplates` 提供测试模板
+- **依赖**: 不依赖 `TestCaseTemplates`（已废弃）；生成器应直接输出“可执行用例”并复用现有 fixtures
 
 ##### `generators/test_case_templates.py` (测试用例模板)
-- **职责**: 提供特定类型的测试用例模板
-- **方法**:
-  - `_gen_type_tests()` - 根据页面类型生成测试
-  - `_login_tests()` - 登录页面测试模板
-  - `_form_tests()` - 表单页面测试模板
+- **状态**: **DEPRECATED**
+- **原因**: 历史上用于生成 TODO 骨架，容易产出“不可跑模板”，与当前规则冲突
+- **替代**: 使用 `TestCaseGenerator` / `TestCodeGenerator` 生成可执行套件（P0/P1/P2/security）
 
 ##### `generators/test_data_generator.py` (测试数据生成器)
 - **职责**: 生成测试数据 JSON 文件
@@ -351,7 +359,8 @@ class BasePage(ABC, PageActions, PageWaits):
 | 2025-12-16 | 新增 `core/page_actions.py` 和 `core/page_waits.py` |
 | 2025-12-16 | 新增 `generators/page_types.py` 数据模型层 |
 | 2025-12-16 | 新增 `generators/element_extractor.py` 元素提取器 |
-| 2025-12-16 | 新增 `generators/test_case_templates.py` 测试模板 |
+| 2025-12-22 | `generators/test_case_templates.py` 标记为 DEPRECATED（禁止生成 TODO 骨架，统一产出可跑套件） |
+| 2025-12-22 | 新增 `utils/rules_loader.py`：运行时加载 `.cursor/rules/**` 并落盘 `reports/rules_context.md`，让“生成过程调用 rule”可审计 |
 | 2025-12-16 | 新增 `generators/test_plan_formatter.py` 和 `test_plan_scenarios.py` |
 | 2025-12-15 | 新增服务健康检查模块 |
 | 2025-12-15 | 扩展配置结构（仓库/多环境/测试数据） |

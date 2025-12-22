@@ -20,7 +20,7 @@ from pathlib import Path
 from datetime import datetime
 import json
 
-from generators.page_analyzer import PageInfo, PageElement
+from generators.page_types import PageInfo, PageElement
 from generators.utils import (
     to_snake_case,
     to_class_name,

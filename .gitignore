@@ -61,8 +61,22 @@ Thumbs.db
 # Analysis Output
 analysis/
 
+# Generated runtime artifacts
+.generated/
+.auth/
+.playwright-mcp/
+.allure-cache/
+.pytest_cache/
+
 # Temporary
 tmp/
 temp/
 *.tmp
+
+# Local env marker (created by fixtures to indicate environment readiness)
+.tmp_env_ready
+
+# Lock / backup files (runtime)
+*.lock
+*.backup
 

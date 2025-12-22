@@ -4,6 +4,144 @@ alwaysApply: true
 
 # ⚠️ 测试用例生成规范（Critical）
 
+> 这是一个“完整可复制”的 tmp 版本：用于手动覆盖 `.cursor/rules/quality/test-case-standards.md`。
+
+## 🧭 测试用例优先级定义（P0/P1/P2）
+
+本项目使用 `pytest.mark.P0 / P1 / P2` 定义优先级（`pytest.ini` 已声明 markers）。
+
+### P0（Critical / 主链路）
+
+#### 📎 Allure 报告降噪（强制）
+
+- Allure 只展示“前端证据步骤”（填写/提交/关键截图）
+- baseline 修正/teardown 回滚/纯断言步骤默认不展示（用 ALLURE_SHOW_DEBUG/ALLURE_SHOW_BACKEND 按需打开）
+
+- **定义**：主流程/关键路径；失败即功能不可用或阻塞上线。
+- **必须覆盖**：
+  - 页面加载（page load）
+  - 主流程成功（happy path）
+  - （推荐）必填校验覆盖：优先放在 **P1 字段矩阵**（更系统、可并发、少重复）；P0 可只保留 1 条代表性哨兵（避免用例膨胀）
+- **强制（本次踩坑固化）**：
+  - **P0 只用“正常数据”**：不得默认使用接近 `maxLength` 的超长字符串。
+  - **baseline 必须“正常化”**：fixture 在进入用例前必须把表单修正到“可提交 + 正常长度”的 baseline（避免超长 baseline 污染 P0 截图/回滚/可读性）。
+  - **写操作必须可回滚且可重复**：每条写操作用例必须恢复 baseline（fixture teardown 兜底），并保存一次确认可重复执行。
+
+
+
+### ✅ 字段矩阵（强制，老兵口味）
+
+当页面是“表单 + 保存（写接口）”时，输入校验应以 **P1 字段矩阵**为主：
+
+- **按字段拆文件**：`test_<page>_p1_<field>_matrix.py`
+- **should_save=False 的场景**必须设置 `require_frontend_error_evidence=True`
+  - 含义：如果前端拦截（不发请求），必须有可见错误证据（validationMessage/aria-invalid/内联提示/invalid 样式）
+- **后端 reject 探针**少而精：只对“典型且后端必拒绝”的非法值做 API reject 验证
+- **避免重复**：若 P1 矩阵已覆盖必填/空白/非法格式，则 P0 不再单独堆每字段必填用例
+
+### P1（High / 输入与异常的高风险点）
+- **定义**：输入校验/边界/格式/关键异常处理；失败风险高但不一定阻塞所有用户。
+- **必须覆盖（表单类）**：
+  - 边界值：**min-1/min/min+1/max-1/max/max+1**（按字段维度）
+  - 格式校验：正则/HTML5 validity/后端约束（以实际实现为准）
+  - 关键业务规则：例如新旧密码相同禁止等
+  - 常见异常：接口失败/超时（页面涉及 API 时）
+
+### P2（Medium / 体验与健壮性）
+- **定义**：UI/可用性/可访问性/交互细节；失败通常不影响核心功能，但影响体验与质量。
+- **推荐最小集合**：字段可见性、tab 导航、键盘 Tab、必填标记展示、基础 a11y。
+
+### `security`（横切维度，建议与 P* 叠加）
+- **定义**：安全类用例使用 `@pytest.mark.security` 标记（不替代 P0/P1/P2）。
+- **建议**：大多数安全用例风险等级接近 P1，可同时标记 `P1 + security`。
+- **最小覆盖**：未登录访问受保护页面应进入登录流程、logout 后应被拦截、XSS 不执行、SQLi 风格输入不导致异常跳转。
+
+---
+
+## ✅ 强制：以前端可观测行为做断言，但以后端 ABP 为真理校准规则（前后端一致性）
+
+目标：**不允许出现“前端放行 → 调后端才报错”的体验缺陷**。
+
+### 规则（必须）
+- **后端 ABP 规则是真理来源**：required/maxLength/pattern/minLength 等以 ABP DTO/OpenAPI 为准。
+- **前端断言是第一优先**：所有校验相关用例，最终必须验证到“用户可见的前端表现”（错误提示/字段 invalid/按钮不可提交）。
+- **一致性断言必须补上**（关键）：对“应被拒绝”的输入：
+  - **前端必须拦截住**：断言“不会发出提交 API”（例如 `PUT /api/account/my-profile` 不应发生）
+  - **后端 ABP 必须同样拒绝**：同一输入用 API 方式直连（带登录态 cookie/session），断言 4xx + 可诊断错误体（body/validationErrors）
+
+### 实践建议（强烈建议）
+- **规则快照**：每个页面至少 1 条 `*_abp_rules_snapshot` 用例，把 OpenAPI/Swagger 抽取出的字段规则挂到 Allure 附件（审计/对齐/排查 drift 用）。
+
+---
+
+## 🗂️ 测试目录组织规范（按模块/页面分目录）
+
+当页面数量增多时，**必须按模块/页面建目录**，避免 `tests/` 根目录扁平堆积。
+
+### 目录结构（推荐）
+
+```
+tests/
+├── admin/
+│   ├── profile/
+│   │   ├── test_profile_settings_p0.py
+│   │   ├── test_profile_settings_p1.py
+│   │   ├── test_profile_settings_p2.py
+│   │   └── test_profile_settings_security.py
+│   └── users/
+│       ├── ...
+├── workflow/
+│   ├── ...
+└── test_example.py  # 示例用例：必须使用 example 标记，不得混入 P0/P1/P2/security
+```
+
+### 文件数量控制（每页建议 2~4 个文件）
+
+- **简单页面**：`p0+p1` 合并即可（1~2 个文件）
+- **复杂页面**：拆分 `p2`、`security`（最多 3~4 个文件）
+- **边界矩阵很大**：可额外拆 `p1_boundary_extra`（仅在必要时使用）
+
+### 命名约定
+
+- **页面目录**：`tests/<module>/<page>/`（如 `tests/admin/profile/`）
+- **文件名**：`test_<page>_<priority>.py`
+  - 例：`test_profile_settings_p0.py` / `test_profile_settings_p1.py` / `test_profile_settings_security.py`
+
+### 执行方式（用 markers 管理，不靠文件名硬找）
+
+- 只跑主回归：`-m P0`
+- 只跑输入校验：`-m P1`
+- 只跑体验/UI：`-m P2`
+- 只跑安全：`-m security`（建议与 P1 叠加：`-m "P1 and security"`）
+
+> 原则：目录表达"归属"（模块/页面），marker 表达"优先级/维度"（P0/P1/P2/security）。
+
+---
+
+## ✅ 强制：初次生成即参照前后端代码补全用例（不允许猜）
+
+生成全量用例集（首次生成时）必须从**前端 + 后端**代码推导字段规则，并将来源写入测试（注释或 Allure step）。
+禁止“先生成一堆骨架/数量达标，再等反馈补规则”。
+
+### 前端规则来源（至少一种，默认必须读）
+- 页面入口：Next.js `src/app/**/page.tsx` / React `src/pages/**` / 组件 `src/components/**`
+- 表单校验：`react-hook-form register()` 的 `required/maxLength/minLength/pattern/validate`
+- **HTML5 validity 必须考虑**：例如 `input type="email"` 可能被浏览器原生校验拦截 submit  
+  → 此类用例优先断言“不会触发提交 API”，不要强绑错误文案（跨 OS/浏览器不稳定）
+
+### 后端规则来源（至少一种，默认必须读）
+- ABP DTO/Attribute：`[Required]` / `[StringLength]` / `[EmailAddress]` 等
+- OpenAPI/SDK：`src/client/types.gen.ts` / `src/client/sdk.gen.ts` 的 DTO 与接口定义
+
+### Security（必须按字段维度）
+- 每个可编辑 input/select/textarea 都要跑最小载荷集（XSS/SQLi）并断言：
+  - 不弹 dialog
+  - 不异常跳转（不应被踢到登录页，除非是未登录用例）
+  - 若触发提交 API：不应为 5xx
+  - 用例结束必须恢复数据（避免污染账号池）
+
+---
+
 ## 测试用例完整性检查清单
 
 **生成测试用例时，必须确保覆盖以下场景：**
@@ -19,17 +157,20 @@ alwaysApply: true
   - 长度限制：必须测试 min-1, min, min+1, max-1, max, max+1
 - ✅ **格式验证测试**（根据验证规则生成）
   - 正则表达式规则 → 生成对应的格式验证测试
-  - 密码相关：必须覆盖所有 ABP 标准规则
 - ✅ **业务逻辑验证**（规范中明确要求的场景）
 - ✅ **API错误处理**（网络错误、服务器错误、超时）
+- ✅ **前后端一致性**（强制）
+  - invalid 输入：前端拦截（不发请求）+ 后端拒绝（4xx）
 
 ### P2 - 一般功能（可选）
-- UI交互测试（显示/隐藏、键盘导航等）
-- 可访问性测试
+- **推荐 P2 最小集合**：字段可见性、tab 导航、键盘 Tab 可用性、必填标记展示
+
+---
 
 ## ❌ 常见错误（禁止）
 
 ### 1. 缺少断言
+
 ```python
 # ❌ 错误：只有 logger.checkpoint，没有实际断言
 logger.checkpoint("验证错误", True)
@@ -41,6 +182,7 @@ assert len(errors) > 0, "应该至少有一个验证错误"
 ```
 
 ### 2. 必填字段验证不完整
+
 ```python
 # ❌ 错误：只验证了部分必填字段
 
@@ -51,53 +193,26 @@ def test_p0_confirm_password_required(...)
 ```
 
 ### 3. 边界值测试缺失
+
 ```python
 # ❌ 错误：只测试了"太短"
 
 # ✅ 正确：完整的边界值测试
-def test_p1_password_too_short(...)      # 小于最小值
-def test_p1_password_too_long(...)       # 大于最大值
+def test_p1_password_too_short(...)        # 小于最小值
+def test_p1_password_too_long(...)         # 大于最大值
 def test_p1_password_boundary_values(...)  # 正好等于 min 和 max
 ```
 
-### 4. 格式验证不完整
-```python
-# ❌ 错误：只测试了长度，没有测试格式要求
+---
 
-# ✅ 正确：根据验证规则生成所有格式验证测试
-def test_p1_password_missing_uppercase(...)
-def test_p1_password_missing_lowercase(...)
-def test_p1_password_missing_digit(...)         # ABP RequireDigit
-def test_p1_password_missing_special_char(...)  # ABP RequireNonAlphanumeric
-```
+## 🔐 Security 用例基线（当用户要求安全测试时，必须覆盖）
 
-## ✅ 测试用例生成流程
+### 鉴权/会话（必须）
+- ✅ **未登录访问受保护页面**：应被重定向到登录流程（如 `/auth/login` 或后端 `/Account/Login`）
+- ✅ **logout 后访问受保护页面**：应再次进入登录流程（防止会话残留）
 
-1. **分析表单字段**
-   - 列出所有字段
-   - 标记必填/可选
-   - 提取验证规则
-   - **如果验证规则不明确，以后端 ABP 框架限制为准**
+### 注入/脚本（必须）
+- ✅ **XSS payload 不得执行**：输入 `<img src=x onerror=alert(1)>` 等载荷，页面不应弹出 dialog
+- ✅ **SQLi 风格字符串不应导致异常行为**：如 `' OR 1=1 --`，页面不应崩溃/异常跳转
 
-2. **生成P0测试用例**
-   - 页面加载
-   - 主流程成功
-   - **每个必填字段一个验证测试**
-
-3. **生成P1测试用例**
-   - **边界值测试**（min-1, min, max, max+1）
-   - **格式验证测试**（根据验证规则）
-   - **ABP 标准密码验证规则必须全部覆盖**
-   - **业务逻辑测试**
-   - **API错误处理**
-
-4. **生成P2测试用例**（可选）
-   - UI交互
-   - 可访问性
-
-5. **验证完整性**
-   - 检查是否有断言（禁止只有注释）
-   - 检查必填字段是否全部覆盖
-   - 检查边界值是否完整
-   - **检查 ABP 密码验证规则是否全部覆盖**（6 个规则）
-   - **检查关键步骤是否有截图**（必须）
+> 说明：安全用例的断言应以“系统不崩、无执行、无越权”为核心，避免强绑定具体 toast 文案。
