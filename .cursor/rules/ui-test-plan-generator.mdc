@@ -12,9 +12,20 @@
 ## 安全约束（必须）
 - **不要把密码写进计划或任何文件**（包括 artifacts/metadata）。
 - 若用户给了密码：只用于当次 MCP 登录/页面分析；计划中写“密码通过环境变量/账号池提供”。
+- **不要把 Token/Cookie/storageState 落盘到 repo**：证据链只允许 UI 可见信息与规则快照（JSON），禁止保存鉴权凭证。
 
 ## 账号来源（必须写清楚）
 - Step1 计划里允许写明“测试账号 email”（用于可读性），但 **Step2 自动化执行默认必须使用账号池**（不得把该账号/密码写死到测试代码里）。
+
+## 配置真理源（必须）
+
+- 所有“环境地址/账号池路径/仓库路径”必须来自：`config/project.yaml`
+  - `environments.<env>.frontend.url` / `environments.<env>.backend.url`
+  - `test_data.accounts.path`
+  - 仓库本地路径优先级：
+    - `repositories.*.local_path`（若非空）
+    - `service_startup.*.cwd`
+- 本规则只做 Step1 文档与证据链；**不要修改账号池内容**（账号池由 fixture 在执行期管理）。
 
 ## 需求对齐（必须）
 - 生成测试计划必须对齐项目需求：`docs/requirements/requirements.md`
@@ -32,11 +43,15 @@
 - 判断是否需要登录态（若跳转登录/403/未授权提示，则标记“需要登录态”并提示用户提供账号）
 - 导出：可见 HTML / 可见文本 / 截图
 
+落盘要求（必须）：
+- `visible.txt` 必须包含：页面标题、核心控件摘要（input/button/tab 等）、是否疑似需要登录态
+- `metadata.json` 必须包含：slug/url/title/元素映射（role+name 优先）/证据文件名列表
+
 如果 MCP 无法使用（例如用户拒绝浏览器权限 / 无法打开 localhost）：
 - 输出失败原因
 - 请求用户提供：storageState/cookie 或 MCP 导出的 PageInfo/HTML/截图（桥接模式）
 
-### 1.5) 规则快照（条件触发：ABP/Swagger 优先；否则走代码识别/计划降级）
+### 1.2) 规则快照（条件触发：ABP/Swagger 优先；否则走代码识别/计划降级）
 
 > 目的：当项目**确实存在可获取的后端规则**时，优先把规则“落盘为证据”，避免阈值凭空猜测；  
 > 但**不是所有项目都是 ABP**，因此本步骤必须是“条件触发”，而不是全局硬前提。
@@ -55,6 +70,9 @@
     - `GET <backend_base>/swagger/v1/swagger.json`
     - `GET <frontend_base>/swagger/v1/swagger.json`
   - 用途：提取 DTO 约束（required/minLength/maxLength/pattern），作为输入校验矩阵的“真理源”
+- `docs/test-plans/artifacts/<slug>/backend_swagger.json`（强烈建议：更权威、更少重定向问题）
+  - 来源：`GET <backend_base>/swagger/v1/swagger.json`
+  - 说明：前端域名下的 swagger 可能被租户/登录流程重定向；优先抓后端直连
 - `docs/test-plans/artifacts/<slug>/abp_rules_extract.json`
   - 内容：从上述 JSON 解析出的“规则摘要”（仅结构化规则，不包含任何用户输入/密码）
 
@@ -66,7 +84,7 @@
 - 若代码也无法识别：在计划中标注 `TBD(无法获得真理源：快照失败 + 代码不可读)`，并说明原因（401/403/404/网络/权限）。
 - **禁止硬猜阈值**：没有快照/代码证据就不写死 requiredLength/maxLength/regex。
 
-### 1.6) 前后端代码识别（条件触发：非 ABP / 规则不足以补全用例时）
+### 1.3) 前后端代码识别（条件触发：非 ABP / 规则不足以补全用例时）
 
 > 目的：当项目不是 ABP（或无法抓取规则快照），但“补全用例”又需要更可靠的约束来源时，  
 > 通过识别前后端代码，抽取**可证据化**的输入限制/业务校验/错误体结构，减少 TBD。
@@ -81,10 +99,10 @@
   - `service_startup.frontend.cwd` / `service_startup.backend.cwd`（用于本地启动的工作目录）
 - 若上述路径不存在/不可读：
   - 记录原因（路径为空/目录不存在/权限不足）
-  - 按 1.5 的降级策略在计划中保留 `TBD(代码识别失败)`，**禁止硬猜阈值**
+  - 按 1.2 的降级策略在计划中保留 `TBD(代码识别失败)`，**禁止硬猜阈值**
 
 触发条件（满足任一即可执行）：
-- 1.5 未触发（项目非 ABP / 无 swagger / 无法访问后端规则）
+- 1.2 未触发（项目非 ABP / 无 swagger / 无法访问后端规则）
 - 计划中的关键阈值/规则仍为 `TBD`，且会影响 P1 矩阵/边界用例的可运行性
 - 页面证据链不足以解释校验来源（例如：提示文案来自后端错误体、或前端 schema）
 
@@ -96,6 +114,7 @@
   - 搜索该路由页面组件 + 表单 schema/validator + 提交 API client
   - 提取：前端拦截逻辑（disabled/inline error/提交前校验）、错误展示绑定点（aria/role/文案来源）
   - **必须提取接口契约**：请求方法 + URL path + 请求体字段（以及可能的状态码/错误体类型）
+  - 推荐证据源（常见于本项目）：`src/client/sdk.gen.ts` / `src/client/types.gen.ts`（OpenAPI 生成的“契约镜像”）
 
 落盘产物（必须脱敏，禁止包含任何密码/凭证/Token）：
 - `docs/test-plans/artifacts/<slug>/code_rules_extract.json`
@@ -112,6 +131,7 @@
 - 用例设计（P0 主链路 + P1 校验矩阵 + security 最小集）
 - 数据设计（JSON：valid/invalid/boundary + policy_matrix（可 TBD））
 - 自动化建议（对齐本仓库：`core/base_page.py`、`auth_page`、账号池回滚）
+- 建议目录（对齐 Step2）：`tests/<module>/<domain>/<page>/`（每个页面一个文件夹）
 
 ## 输出要求（硬规则）
 - 必须写到：`docs/test-plans/<slug>.md`
