@@ -1,0 +1,62 @@
+# 项目核心定位与架构
+
+## 项目定位
+
+这是一个 **AI 驱动的 Playwright + Python 自动化测试脚手架**，通过自然语言对话生成：
+- Page Object 页面对象  
+- Test Cases 测试用例
+- Test Data 测试数据
+- Test Reports 测试报告（Allure HTML）
+
+**使用方式（当前仓库口径）**：
+- 对话：生成测试计划 / 生成测试代码
+- 手动：运行 pytest + 生成/打开 Allure（见 `docs/manual-workflow.md` 与 `Makefile`）
+
+## 🚀 核心测试流程
+
+**固定 3 步（当前仓库口径）**：
+
+- **Step1：生成测试计划**
+  - 对话中使用：`@.cursor/rules/ui-test-plan-generator.mdc + URL (+ 账号)`
+  - 产物：`docs/test-plans/<slug>.md` + `docs/test-plans/artifacts/<slug>/`
+  - 口径：计划阶段以证据链为主；校验/边界规则优先来自“可审计真理源”（后端契约/规则快照），否则再通过前后端代码识别推导
+
+- **Step2：基于计划生成代码**
+  - 对话中使用：`@docs/test-plans/<slug>.md @.cursor/rules/ui-automation-code-generator.mdc`
+  - 产物：`pages/` + `tests/` + `test-data/`
+
+- **Step3：手动执行与报告**
+  - 推荐命令：`make test` → `make report` → `make serve`（详见 `docs/manual-workflow.md`）
+
+**触发指令**：
+- "帮我测试 xxx 页面"
+- "生成 xxx 功能的测试"
+- "测试 /admin/profile/change-password"
+
+**核心特点**：
+- ✅ 端到端可闭环：计划 → 代码 → 执行 → 报告（执行/报告推荐手动）
+- ✅ 无外部依赖：完全本地执行
+- ✅ 企业级质量：Allure 报告 + 完整截图
+- ✅ 智能数据管理：独立账号 + 自动清洗
+- ✅ 多框架规则补全：可选 ABP 规则快照；非 ABP 通过前后端代码识别补全用例
+
+## ⚠️ 生成代码前的最小约束（别把自己逼疯）
+
+生成/修改代码时，优先对齐：
+- `core/base_page.py`（页面对象基类与封装方式）
+- `generators/*_generator.py`（本仓库生成口径/命名/目录结构）
+
+## 测试优先级
+
+| 标记 | 含义 | 场景 |
+|------|------|------|
+| P0 | 核心功能 | 主流程、关键路径 |
+| P1 | 重要功能 | 输入验证、边界值 |
+| P2 | 一般功能 | UI样式、可访问性 |
+
+## 代码风格
+
+- 中文注释，英文代码
+- 使用 ASCII 风格分块注释
+- 文件不超过 400 行
+- 函数职责单一

@@ -7,6 +7,8 @@
 
 import logging
 import os
+import time
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -54,6 +56,27 @@ def get_logger(name: str = __name__) -> logging.Logger:
     logger.addHandler(file_handler)
     
     return logger
+
+
+@contextmanager
+def workflow_stage(logger: logging.Logger, name: str, **meta):
+    """
+    Workflow 阶段打点（开始/结束/耗时/异常）。
+    - 目标：让用户在长流程中知道“现在跑到哪一步了”
+    - 形式：控制台 INFO 一行开始 + 一行结束（失败会输出 exception 堆栈）
+    """
+    meta_str = " ".join([f"{k}={v}" for k, v in (meta or {}).items() if v is not None and str(v) != ""])
+    title = f"{name} ({meta_str})" if meta_str else name
+    start = time.perf_counter()
+    logger.info(f"[workflow] ▶ {title}")
+    try:
+        yield
+        dur = time.perf_counter() - start
+        logger.info(f"[workflow] ✓ {title} ({dur:.2f}s)")
+    except Exception:
+        dur = time.perf_counter() - start
+        logger.exception(f"[workflow] ✗ {title} ({dur:.2f}s)")
+        raise
 
 
 class TestLogger:

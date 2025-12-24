@@ -235,12 +235,13 @@ class DataManager:
             def _last_used_key(acc):
                 last_used = acc.get("last_used")
                 if not last_used:
-                    # 从未使用过的账号放到最后（很多项目里账号池可能并非都已注册）
-                    return datetime.max
+                    # 从未使用过的账号优先（更均匀分摊，降低单账号 lockout 风险）
+                    # 若账号确实未注册/不可用，应在失败时通过 mark_account_locked 锁定并跳过。
+                    return datetime.min
                 try:
                     return datetime.fromisoformat(last_used)
                 except Exception:
-                    return datetime.max
+                    return datetime.min
 
             candidates = [
                 acc for acc in pool
@@ -297,11 +298,15 @@ class DataManager:
                 # 在账号池中找到该账号
                 for account in pool:
                     if account.get("username") == username:
+                        # 若账号已被明确标记为不可用（invalid_credentials / lockout 等），不要在测试前清理时“解锁”
+                        keep_locked = bool(account.get("is_locked")) and bool(account.get("locked_reason"))
+
                         # 清理状态
                         account["in_use"] = False
-                        account["is_locked"] = False
-                        if "locked_reason" in account:
-                            del account["locked_reason"]
+                        if not keep_locked:
+                            account["is_locked"] = False
+                            if "locked_reason" in account:
+                                del account["locked_reason"]
                         if "test_name" in account:
                             del account["test_name"]
                         
@@ -338,12 +343,9 @@ class DataManager:
                         if "test_name" in account:
                             del account["test_name"]
             
-            # 3. 解锁所有被锁定的账号（测试前重置状态）
-            for account in pool:
-                if account.get("is_locked", False):
-                    account["is_locked"] = False
-                    if "locked_reason" in account:
-                        del account["locked_reason"]
+            # 3. 不要在每条用例前“全量解锁”：
+            # - is_locked 常用于标记 invalid_credentials / lockout 等不可用账号
+            # - 每次清空会导致同一个坏账号被反复分配，造成大量 setup 失败与噪音
             
             # 保存账号池（已经持有锁，传入lock_acquired=True）
             self._save_account_pool(data, lock_acquired=True)
@@ -373,14 +375,18 @@ class DataManager:
             # 在账号池中找到该账号
             for account in pool:
                 if account.get("username") == username:
+                    # 若账号已被明确标记为不可用（invalid/lockout 等），不要在测试后自动“解锁”
+                    keep_locked = bool(account.get("is_locked")) and bool(account.get("locked_reason"))
+
                     # 1. 释放账号状态
                     account["in_use"] = False
                     account["last_used"] = datetime.now().isoformat()
                     
                     # 2. 恢复账号到初始状态
-                    account["is_locked"] = False
-                    if "locked_reason" in account:
-                        del account["locked_reason"]
+                    if not keep_locked:
+                        account["is_locked"] = False
+                        if "locked_reason" in account:
+                            del account["locked_reason"]
                     if "test_name" in account:
                         del account["test_name"]
                     

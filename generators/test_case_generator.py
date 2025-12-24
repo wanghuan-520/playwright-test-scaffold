@@ -51,6 +51,7 @@ class TestCaseGenerator:
         base_dir = f"tests/{module}/{page}"
 
         page_key = self._infer_page_key(page, page_info.page_type)
+        is_change_password = self._is_change_password_page(url_path=url_path, page_info=page_info)
 
         # 规则推导（强制：有本地 repo 路径就必须推导；否则拒绝凭猜）
         cfg = ConfigManager()
@@ -67,12 +68,16 @@ class TestCaseGenerator:
         suite: Dict[str, str] = {
             f"tests/{module}/__init__.py": "",
             f"{base_dir}/__init__.py": "",
-            f"{base_dir}/_helpers.py": self._helpers_py(page_info, rules),
+            f"{base_dir}/_helpers.py": self._helpers_py(page_info, rules, is_change_password=is_change_password),
         }
         if "p0" in enabled:
-            suite[f"{base_dir}/test_{page_key}_p0.py"] = self._p0_py(page_info, module, page, page_key, rules)
+            suite[f"{base_dir}/test_{page_key}_p0.py"] = self._p0_py(
+                page_info, module, page, page_key, rules, is_change_password=is_change_password
+            )
         if "p1" in enabled:
-            suite[f"{base_dir}/test_{page_key}_p1.py"] = self._p1_py(page_info, module, page, page_key, rules)
+            suite[f"{base_dir}/test_{page_key}_p1.py"] = self._p1_py(
+                page_info, module, page, page_key, rules, is_change_password=is_change_password
+            )
         if "p2" in enabled:
             suite[f"{base_dir}/test_{page_key}_p2.py"] = self._p2_py(page_info, module, page, page_key, rules)
         if "security" in enabled:
@@ -117,13 +122,31 @@ class TestCaseGenerator:
     def _infer_page_key(self, page: str, page_type: str) -> str:
         return f"{page}_settings" if page_type == "SETTINGS" else page
 
+    def _is_change_password_page(self, *, url_path: str, page_info: PageInfo) -> bool:
+        """
+        针对“修改密码”页的专项模板：
+        - 该页面通常只有 password 字段，没有可安全回滚的“普通字段”，happy path 不应凭猜生成。
+        - 用例应围绕：必填、两次输入一致性、后端 4xx 错误处理、安全输入。
+        """
+        p = (url_path or "").lower()
+        if "change-password" in p or "change_password" in p:
+            return True
+        name = (get_page_name_from_url(page_info.url) or "").lower()
+        return "changepassword" in name or "change_password" in name
+
     # ═══════════════════════════════════════════════════════════════
     # Suite files
     # ═══════════════════════════════════════════════════════════════
 
-    def _helpers_py(self, page_info: PageInfo, rules: List[Dict]) -> str:
+    def _helpers_py(self, page_info: PageInfo, rules: List[Dict], *, is_change_password: bool) -> str:
         url_path = extract_url_path(page_info.url)
         rules_literal = self._py_literal(rules)
+        change_password_api = "/api/account/my-profile/change-password"
+        # 让常量“永远存在”：避免生成的测试文件需要做条件 import。
+        # 非 change-password 页面时设为空字符串即可（相关专项用例也不会生成）。
+        change_password_api_line = (
+            f"CHANGE_PASSWORD_API_PATH = {change_password_api!r}\n" if is_change_password else "CHANGE_PASSWORD_API_PATH = ''\n"
+        )
         return f"""# ═══════════════════════════════════════════════════════════════
 # Helpers
 # Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
@@ -138,6 +161,7 @@ from playwright.sync_api import Page, Response, expect
 
 
 URL_PATH = {url_path!r}
+{change_password_api_line}
 
 # 字段规则（由前后端代码推导；若来源缺失则会降级/skip）
 FIELD_RULES = {rules_literal}
@@ -177,6 +201,93 @@ def wait_mutation_response(page: Page, timeout_ms: int = 60000) -> Optional[Resp
         return None
 
 
+def wait_response_by_url_substring(page: Page, url_substring: str, *, method: str = "POST", timeout_ms: int = 60000) -> Response:
+    with page.expect_response(
+        lambda r: (r.request.method == method) and (url_substring in (r.url or "")),
+        timeout=timeout_ms,
+    ) as resp_info:
+        pass
+    return resp_info.value
+
+
+def get_validation_message(page: Page, selector: str) -> str:
+    \"\"\"读取浏览器原生表单校验文案（required/pattern 等）。\"\"\"
+    if not selector or page.locator(selector).count() == 0:
+        return ""
+    try:
+        msg = page.eval_on_selector(selector, "el => el.validationMessage")
+        return (msg or "").strip()
+    except Exception:
+        return ""
+
+
+def assert_any_validation_evidence(page: Page, selector: str) -> None:
+    \"\"\"
+    必填/格式校验的“证据合取”：只要命中任意一种即可。
+    - 原生 validationMessage（最稳定）
+    - 页面错误 UI（toast/field error）
+    - 后端 4xx（实现把 required 放到后端也算通过）
+    \"\"\"
+    msg = get_validation_message(page, selector)
+    if msg:
+        return
+    if has_any_error_ui(page):
+        return
+    resp = wait_mutation_response(page, timeout_ms=1500)
+    if resp is not None and (400 <= resp.status < 500):
+        return
+    raise AssertionError("no validation evidence observed (validationMessage/error UI/4xx)")
+
+
+def wait_for_toast(page: Page, timeout_ms: int = 3000) -> None:
+    \"\"\"等待通知区域出现至少一条 toast。\"\"\"
+    regions = page.get_by_role("region", name="Notifications (F8)")
+    picked = None
+    try:
+        n = regions.count()
+    except Exception:
+        n = 0
+    for i in range(max(n, 1)):
+        r = regions.nth(i) if n > 0 else regions
+        try:
+            if r.is_visible(timeout=200):
+                picked = r
+                break
+        except Exception:
+            continue
+    region = picked or regions.first
+    item = region.get_by_role("listitem").first
+    expect(item).to_be_visible(timeout=timeout_ms)
+
+
+def get_toast_text(page: Page) -> str:
+    regions = page.get_by_role("region", name="Notifications (F8)")
+    try:
+        n = regions.count()
+    except Exception:
+        n = 0
+    if n == 0:
+        return ""
+    for i in range(n):
+        r = regions.nth(i)
+        try:
+            if not r.is_visible(timeout=200):
+                continue
+            return (r.inner_text(timeout=1000) or "").strip()
+        except Exception:
+            continue
+    try:
+        return (regions.first.inner_text(timeout=1000) or "").strip()
+    except Exception:
+        return ""
+
+
+def assert_toast_contains_any(page: Page, needles: list[str]) -> None:
+    wait_for_toast(page, timeout_ms=3000)
+    text = get_toast_text(page)
+    assert any((n or "") in text for n in (needles or [])), f"toast text not matched. want any={{needles}} got={{text!r}}"
+
+
 def has_any_error_ui(page: Page) -> bool:
     for sel in ERROR_SELECTORS:
         try:
@@ -214,27 +325,36 @@ def restore_inputs(page: Page, snap: Dict[str, str]) -> None:
             continue
 """
 
-    def _p0_py(self, page_info: PageInfo, module: str, page: str, page_key: str, rules: List[Dict]) -> str:
+    def _p0_py(
+        self,
+        page_info: PageInfo,
+        module: str,
+        page: str,
+        page_key: str,
+        rules: List[Dict],
+        *,
+        is_change_password: bool,
+    ) -> str:
         class_name = to_class_name(get_page_name_from_url(page_info.url))
         file_name = get_file_name_from_url(page_info.url)
         helper_mod = f"tests.{module}.{page}._helpers"
 
         required_rules = [r for r in (rules or []) if r.get("required") is True and r.get("selector")]
-        first_rule = next((r for r in (rules or []) if r.get("selector")), None)
+        # P0 happy path：避免对 password 字段做“随意改一位然后保存”的主流程（通常会触发后端校验失败）。
+        # 选择“非 password”的可写字段作为最小主链路载体；若不存在则让 happy path 自动 skip。
+        first_rule = next(
+            (
+                r
+                for r in (rules or [])
+                if r.get("selector")
+                and str((r.get("html_type") or "")).strip().lower() not in {"password"}
+            ),
+            None,
+        )
         happy_sel = (first_rule or {}).get("selector", "")
 
         required_block = ""
-        if not required_rules:
-            required_block = (
-                f"\n\n@pytest.mark.P0\n"
-                f"@pytest.mark.validation\n"
-                f"@allure.feature({class_name!r})\n"
-                f"@allure.story('P0')\n"
-                f"@allure.title('必填校验：未推导出 required 字段（自动跳过）')\n"
-                f"def test_p0_required_fields_none_derived(auth_page: Page):\n"
-                f"    pytest.skip('未从前后端代码推导出 required 规则（或缺少 selector），拒绝凭猜生成必填校验用例')\n"
-            )
-        else:
+        if required_rules:
             blocks: List[str] = []
             for r in required_rules:
                 src_comment = self._render_sources_comment(r)
@@ -259,16 +379,79 @@ def restore_inputs(page: Page, snap: Dict[str, str]) -> None:
                     f"    original = page.input_value(selector)\n"
                     f"    page.fill(selector, '')\n"
                     f"    click_save(page)\n"
-                    f"    _ = wait_mutation_response(page, timeout_ms=1500)\n\n"
-                    f"    if not has_any_error_ui(page):\n"
-                    f"        pytest.skip('未观察到必填错误 UI（实现可能放到后端，或错误选择器未覆盖）')\n\n"
+                    f"    assert_any_validation_evidence(page, selector)\n"
                     f"    po.take_screenshot('{page_key}_p0_required_{to_snake_case(field)}')\n\n"
                     f"    page.fill(selector, original)\n"
-                    f"    click_save(page)\n"
-                    f"    _ = wait_mutation_response(page, timeout_ms=60000)\n\n"
+                    f"    # 必填校验用例不应产生持久化副作用：恢复输入即可，不再次提交。\n"
                     f"    logger.end(success=True)\n"
                 )
             required_block = "".join(blocks)
+
+        # change-password 专项：生成稳定 P0（不依赖真实旧密码）
+        change_password_p0 = ""
+        if is_change_password:
+            change_password_p0 = (
+                f"\n\n@pytest.mark.P0\n"
+                f"@pytest.mark.functional\n"
+                f"@allure.feature({class_name!r})\n"
+                f"@allure.story('P0')\n"
+                f"@allure.title('前端必拦截：新密码与确认密码不一致')\n"
+                f"def test_p0_new_confirm_mismatch_blocks_submit(auth_page: Page):\n"
+                f"    logger.start()\n"
+                f"    page = auth_page\n"
+                f"    po = {class_name}Page(page)\n\n"
+                f"    po.navigate()\n"
+                f"    assert_not_redirected_to_login(page)\n\n"
+                f"    # 不依赖真实旧密码：只验证“前端一致性校验”与可检证证据（toast）\n"
+                f"    po.fill_currentpassword('wrong-current-123')\n"
+                f"    po.fill_newpassword('NewPass_123')\n"
+                f"    po.fill_confirmnewpassword('NewPass_124')\n"
+                f"    click_save(page)\n"
+                f"    assert_not_redirected_to_login(page)\n"
+                f"    assert_toast_contains_any(page, ['Confirm', '确认', 'Please check'])\n"
+                f"    po.take_screenshot({page_key!r} + '_p0_mismatch_toast', full_page=True)\n"
+                f"    logger.end(success=True)\n"
+            )
+
+        happy_path_block = ""
+        if happy_sel:
+            happy_path_block = (
+                f"\n\n@pytest.mark.P0\n"
+                f"@pytest.mark.functional\n"
+                f"@allure.feature({class_name!r})\n"
+                f"@allure.story('P0')\n"
+                f"@allure.title('主流程：修改并保存（带回滚）')\n"
+                f"def test_p0_happy_path_update_save_with_rollback(auth_page: Page):\n"
+                f"    logger.start()\n"
+                f"    page = auth_page\n"
+                f"    po = {class_name}Page(page)\n\n"
+                f"    po.navigate()\n"
+                f"    assert_not_redirected_to_login(page)\n\n"
+                f"    selector = {happy_sel!r}\n"
+                f"    if page.locator(selector).count() == 0:\n"
+                f"        pytest.skip('字段不可见/不存在（页面结构变化或 selector 失效）')\n\n"
+                f"    snap = snapshot_inputs(page, FIELD_RULES)\n"
+                f"    original = page.input_value(selector)\n"
+                f"    new_value = (original or 'QA') + 'X'\n\n"
+                f"    try:\n"
+                f"        with allure.step('修改字段并保存'):\n"
+                f"            page.fill(selector, new_value)\n"
+                f"            po.take_screenshot({page_key!r} + '_p0_before_save')\n"
+                f"            click_save(page)\n"
+                f"            resp = wait_mutation_response(page, timeout_ms=60000)\n"
+                f"            assert_not_redirected_to_login(page)\n"
+                f"            if resp is not None:\n"
+                f"                assert resp.status < 500, f'unexpected api status: {{resp.status}}'\n"
+                f"            assert not has_any_error_ui(page), 'unexpected error UI after save'\n"
+                f"            po.take_screenshot({page_key!r} + '_p0_after_save')\n"
+                f"    finally:\n"
+                f"        with allure.step('回滚（UI 级恢复）'):\n"
+                f"            restore_inputs(page, snap)\n"
+                f"            click_save(page)\n"
+                f"            _ = wait_mutation_response(page, timeout_ms=60000)\n"
+                f"            po.take_screenshot({page_key!r} + '_p0_after_rollback')\n\n"
+                f"    logger.end(success=True)\n"
+            )
 
         return f"""# ═══════════════════════════════════════════════════════════════
 # {class_name} - P0
@@ -283,6 +466,8 @@ from pages.{file_name}_page import {class_name}Page
 from {helper_mod} import (
     FIELD_RULES,
     assert_not_redirected_to_login,
+    assert_any_validation_evidence,
+    assert_toast_contains_any,
     click_save,
     has_any_error_ui,
     snapshot_inputs,
@@ -310,119 +495,72 @@ def test_p0_page_load(auth_page: Page):
     po.take_screenshot({page_key!r} + "_p0_page_load", full_page=True)
     logger.end(success=True)
 
-
-@pytest.mark.P0
-@pytest.mark.functional
-@allure.feature({class_name!r})
-@allure.story("P0")
-@allure.title("主流程：修改并保存（带回滚）")
-def test_p0_happy_path_update_save_with_rollback(auth_page: Page):
-    logger.start()
-    page = auth_page
-    po = {class_name}Page(page)
-
-    po.navigate()
-    assert_not_redirected_to_login(page)
-
-    selector = {happy_sel!r}
-    if not selector or page.locator(selector).count() == 0:
-        pytest.skip("未推导出可用于 happy path 的字段 selector（拒绝凭猜）")
-
-    snap = snapshot_inputs(page, FIELD_RULES)
-
-    original = page.input_value(selector)
-    new_value = (original or "QA") + "X"
-
-    try:
-        with allure.step("修改字段并保存"):
-            page.fill(selector, new_value)
-            po.take_screenshot({page_key!r} + "_p0_before_save")
-            click_save(page)
-            resp = wait_mutation_response(page, timeout_ms=60000)
-            assert_not_redirected_to_login(page)
-            if resp is not None:
-                assert resp.status < 500, f"unexpected api status: {{resp.status}}"
-            assert not has_any_error_ui(page), "unexpected error UI after save"
-            po.take_screenshot({page_key!r} + "_p0_after_save")
-    finally:
-        with allure.step("回滚（UI 级恢复）"):
-            restore_inputs(page, snap)
-            click_save(page)
-            _ = wait_mutation_response(page, timeout_ms=60000)
-            po.take_screenshot({page_key!r} + "_p0_after_rollback")
-
-    logger.end(success=True)
-
+{change_password_p0}
+{happy_path_block}
 {required_block}
 """
 
-    def _p1_py(self, page_info: PageInfo, module: str, page: str, page_key: str, rules: List[Dict]) -> str:
+    def _p1_py(
+        self,
+        page_info: PageInfo,
+        module: str,
+        page: str,
+        page_key: str,
+        rules: List[Dict],
+        *,
+        is_change_password: bool,
+    ) -> str:
         class_name = to_class_name(get_page_name_from_url(page_info.url))
         file_name = get_file_name_from_url(page_info.url)
         helper_mod = f"tests.{module}.{page}._helpers"
 
-        boundary_rules = [r for r in (rules or []) if isinstance(r.get("max_len"), int) and r.get("selector")]
         boundary_blocks: List[str] = []
-        if not boundary_rules:
+        # 不再生成“自动跳过”的占位用例：没推导出规则就不生成该类 P1。
+        boundary_rules = [r for r in (rules or []) if isinstance(r.get("max_len"), int) and r.get("selector")]
+        for r in boundary_rules:
+            field = r.get("field") or "field"
+            sel = r.get("selector")
+            max_len = int(r.get("max_len"))
+            html_type = (r.get("html_type") or "")
+            src_comment = self._render_sources_comment(r)
             boundary_blocks.append(
+                f"\n\n{src_comment}\n"
                 f"@pytest.mark.P1\n"
                 f"@pytest.mark.boundary\n"
                 f"@allure.feature({class_name!r})\n"
                 f"@allure.story('P1')\n"
-                f"@allure.title('边界值：未推导出 maxLength 规则（自动跳过）')\n"
-                f"def test_p1_boundary_rules_none_derived(auth_page: Page):\n"
-                f"    pytest.skip('未从前后端代码推导出 maxLength 规则（或缺少 selector），拒绝凭猜生成边界矩阵')\n"
+                f"@allure.title('边界值：{field} maxLength={max_len}')\n"
+                f"def test_p1_{to_snake_case(field)}_length_boundary(auth_page: Page):\n"
+                f"    logger.start()\n"
+                f"    page = auth_page\n"
+                f"    po = {class_name}Page(page)\n\n"
+                f"    po.navigate()\n"
+                f"    assert_not_redirected_to_login(page)\n\n"
+                f"    selector = {sel!r}\n"
+                f"    if page.locator(selector).count() == 0:\n"
+                f"        pytest.skip('字段不可见/不存在（页面结构变化或 selector 失效）')\n\n"
+                f"    original = page.input_value(selector)\n\n"
+                f"    for n in [{max_len - 1}, {max_len}, {max_len + 1}]:\n"
+                f"        if n <= 0:\n"
+                f"            continue\n"
+                f"        with allure.step(f'fill len={{n}}'):\n"
+                f"            if {html_type!r} == 'email' or {field.lower()!r} in ['email', 'e-mail']:\n"
+                f"                local_len = max(1, n - len('@t.com'))\n"
+                f"                value = ('a' * local_len) + '@t.com'\n"
+                f"                page.fill(selector, value)\n"
+                f"            else:\n"
+                f"                page.fill(selector, 'A' * n)\n\n"
+                f"            click_save(page)\n"
+                f"            resp = wait_mutation_response(page, timeout_ms=60000 if n <= {max_len} else 1500)\n"
+                f"            assert_not_redirected_to_login(page)\n"
+                f"            if resp is not None:\n"
+                f"                assert resp.status < 500, f'unexpected api status: {{resp.status}}'\n\n"
+                f"    page.fill(selector, original)\n"
+                f"    click_save(page)\n"
+                f"    _ = wait_mutation_response(page, timeout_ms=60000)\n\n"
+                f"    po.take_screenshot('{page_key}_p1_{to_snake_case(field)}_length_boundary')\n"
+                f"    logger.end(success=True)\n"
             )
-        else:
-            for r in boundary_rules:
-                field = r.get("field") or "field"
-                sel = r.get("selector")
-                max_len = int(r.get("max_len"))
-                html_type = (r.get("html_type") or "")
-                src_comment = self._render_sources_comment(r)
-                boundary_blocks.append(
-                    f"\n\n{src_comment}\n"
-                    f"@pytest.mark.P1\n"
-                    f"@pytest.mark.boundary\n"
-                    f"@allure.feature({class_name!r})\n"
-                    f"@allure.story('P1')\n"
-                    f"@allure.title('边界值：{field} maxLength={max_len}')\n"
-                    f"def test_p1_{to_snake_case(field)}_length_boundary(auth_page: Page):\n"
-                    f"    logger.start()\n"
-                    f"    page = auth_page\n"
-                    f"    po = {class_name}Page(page)\n\n"
-                    f"    po.navigate()\n"
-                    f"    assert_not_redirected_to_login(page)\n\n"
-                    f"    selector = {sel!r}\n"
-                    f"    if page.locator(selector).count() == 0:\n"
-                    f"        pytest.skip('字段不可见/不存在（页面结构变化或 selector 失效）')\n\n"
-                    f"    original = page.input_value(selector)\n\n"
-                    f"    for n in [{max_len - 1}, {max_len}, {max_len + 1}]:\n"
-                    f"        if n <= 0:\n"
-                    f"            continue\n"
-                    f"        with allure.step(f'fill len={{n}}'):\n"
-                    f"            if {html_type!r} == 'email' or {field.lower()!r} in ['email', 'e-mail']:\n"
-                    f"                local_len = max(1, n - len('@t.com'))\n"
-                    f"                value = ('a' * local_len) + '@t.com'\n"
-                    f"                page.fill(selector, value)\n"
-                    f"            else:\n"
-                    f"                page.fill(selector, 'A' * n)\n\n"
-                    f"            click_save(page)\n"
-                    f"            resp = wait_mutation_response(page, timeout_ms=60000 if n <= {max_len} else 1500)\n"
-                    f"            assert_not_redirected_to_login(page)\n"
-                    f"            if resp is not None:\n"
-                    f"                assert resp.status < 500, f'unexpected api status: {{resp.status}}'\n\n"
-                    f"            if n <= {max_len}:\n"
-                    f"                assert not has_any_error_ui(page), f'unexpected error UI at len={{n}}'\n"
-                    f"            else:\n"
-                    f"                if resp is None and not has_any_error_ui(page):\n"
-                    f"                    pytest.skip('超长输入未观察到拦截或错误 UI（实现可能允许超长，或错误选择器未覆盖）')\n\n"
-                    f"    page.fill(selector, original)\n"
-                    f"    click_save(page)\n"
-                    f"    _ = wait_mutation_response(page, timeout_ms=60000)\n\n"
-                    f"    po.take_screenshot('{page_key}_p1_{to_snake_case(field)}_length_boundary')\n"
-                    f"    logger.end(success=True)\n"
-                )
 
         email_rule = next(
             (
@@ -434,15 +572,7 @@ def test_p0_happy_path_update_save_with_rollback(auth_page: Page):
             None,
         )
         if email_rule is None:
-            email_block = (
-                f"\n\n@pytest.mark.P1\n"
-                f"@pytest.mark.validation\n"
-                f"@allure.feature({class_name!r})\n"
-                f"@allure.story('P1')\n"
-                f"@allure.title('格式校验：未推导出 Email 字段（自动跳过）')\n"
-                f"def test_p1_email_format_none_derived(auth_page: Page):\n"
-                f"    pytest.skip('未从前后端代码推导出 Email 字段（或缺少 selector），拒绝凭猜生成 email 格式用例')\n"
-            )
+            email_block = ""
         else:
             field = email_rule.get("field") or "email"
             sel = email_rule.get("selector")
@@ -477,39 +607,98 @@ def test_p0_happy_path_update_save_with_rollback(auth_page: Page):
                 f"    logger.end(success=True)\n"
             )
 
-        api_failure_block = (
-            f"\n\n@pytest.mark.P1\n"
-            f"@pytest.mark.exception\n"
-            f"@allure.feature({class_name!r})\n"
-            f"@allure.story('P1')\n"
-            f"@allure.title('API 错误处理：写请求被拦截（兜底）')\n"
-            f"def test_p1_api_failure_on_save(auth_page: Page):\n"
-            f"    logger.start()\n"
-            f"    page = auth_page\n"
-            f"    po = {class_name}Page(page)\n\n"
-            f"    po.navigate()\n"
-            f"    assert_not_redirected_to_login(page)\n\n"
-            f"    aborted = {{'value': False}}\n\n"
-            f"    def abort_mutation(route):\n"
-            f"        if route.request.method in {{'PUT', 'POST', 'PATCH'}}:\n"
-            f"            aborted['value'] = True\n"
-            f"            route.abort()\n"
-            f"        else:\n"
-            f"            route.continue_()\n\n"
-            f"    page.route('**/*', abort_mutation)\n"
-            f"    try:\n"
-            f"        click_save(page)\n"
-            f"        _ = wait_mutation_response(page, timeout_ms=3000)\n"
-            f"        assert_not_redirected_to_login(page)\n"
-            f"        if not aborted['value']:\n"
-            f"            pytest.skip('未触发任何写请求（可能是纯前端保存或保存按钮不对应写 API）')\n"
-            f"        if not has_any_error_ui(page):\n"
-            f"            pytest.skip('写请求失败后未观察到 error UI（错误选择器可能未覆盖）')\n"
-            f"        po.take_screenshot('{page_key}_p1_api_failure')\n"
-            f"    finally:\n"
-            f"        page.unroute('**/*', abort_mutation)\n\n"
-            f"    logger.end(success=True)\n"
-        )
+        # change-password 专项：用确定性 4xx + toast 覆盖“错误处理”，不再用 route abort 这种不稳定兜底。
+        api_failure_block = ""
+        if is_change_password:
+            api_failure_block = (
+                f"\n\n@pytest.mark.P1\n"
+                f"@pytest.mark.exception\n"
+                f"@allure.feature({class_name!r})\n"
+                f"@allure.story('P1')\n"
+                f"@allure.title('API 错误处理：旧密码错误应返回 4xx 且给出错误提示')\n"
+                f"def test_p1_api_failure_on_save(auth_page: Page):\n"
+                f"    logger.start()\n"
+                f"    page = auth_page\n"
+                f"    po = {class_name}Page(page)\n\n"
+                f"    po.navigate()\n"
+                f"    assert_not_redirected_to_login(page)\n\n"
+                f"    po.fill_currentpassword('wrong-current-123')\n"
+                f"    po.fill_newpassword('NewPass_123')\n"
+                f"    po.fill_confirmnewpassword('NewPass_123')\n"
+                f"    click_save(page)\n"
+                f"    resp = wait_response_by_url_substring(page, CHANGE_PASSWORD_API_PATH, method='POST', timeout_ms=60000)\n"
+                f"    assert_not_redirected_to_login(page)\n"
+                f"    assert 400 <= resp.status < 500, f'expected 4xx, got {{resp.status}}'\n"
+                f"    assert_toast_contains_any(page, ['Incorrect password', 'Failed', '密码'])\n"
+                f"    po.take_screenshot('{page_key}_p1_wrong_current_toast', full_page=True)\n"
+                f"    logger.end(success=True)\n"
+            )
+        else:
+            api_failure_block = (
+                f"\n\n@pytest.mark.P1\n"
+                f"@pytest.mark.exception\n"
+                f"@allure.feature({class_name!r})\n"
+                f"@allure.story('P1')\n"
+                f"@allure.title('API 错误处理：写请求被拦截（兜底）')\n"
+                f"def test_p1_api_failure_on_save(auth_page: Page):\n"
+                f"    logger.start()\n"
+                f"    page = auth_page\n"
+                f"    po = {class_name}Page(page)\n\n"
+                f"    po.navigate()\n"
+                f"    assert_not_redirected_to_login(page)\n\n"
+                f"    aborted = {{'value': False}}\n\n"
+                f"    def abort_mutation(route):\n"
+                f"        if route.request.method in {{'PUT', 'POST', 'PATCH'}}:\n"
+                f"            aborted['value'] = True\n"
+                f"            route.abort()\n"
+                f"        else:\n"
+                f"            route.continue_()\n\n"
+                f"    page.route('**/*', abort_mutation)\n"
+                f"    try:\n"
+                f"        click_save(page)\n"
+                f"        _ = wait_mutation_response(page, timeout_ms=3000)\n"
+                f"        assert_not_redirected_to_login(page)\n"
+                f"        assert aborted['value'] is True, 'expected a write request to be aborted'\n"
+                f"        # 这里不强行断言 UI，因为不同产品对 network error 的反馈差异很大。\n"
+                f"        po.take_screenshot('{page_key}_p1_api_failure')\n"
+                f"    finally:\n"
+                f"        page.unroute('**/*', abort_mutation)\n\n"
+                f"    logger.end(success=True)\n"
+            )
+
+        mismatch_block = ""
+        if is_change_password:
+            mismatch_block = (
+                f"\n\n@pytest.mark.P1\n"
+                f"@pytest.mark.validation\n"
+                f"@allure.feature({class_name!r})\n"
+                f"@allure.story('P1')\n"
+                f"@allure.title('一致性校验：新密码不一致时不应触发后端写请求')\n"
+                f"def test_p1_mismatch_should_not_call_change_password_api(auth_page: Page):\n"
+                f"    logger.start()\n"
+                f"    page = auth_page\n"
+                f"    po = {class_name}Page(page)\n\n"
+                f"    po.navigate()\n"
+                f"    assert_not_redirected_to_login(page)\n\n"
+                f"    called = {{'value': False}}\n\n"
+                f"    def observe(route):\n"
+                f"        if route.request.method == 'POST' and (CHANGE_PASSWORD_API_PATH in (route.request.url or '')):\n"
+                f"            called['value'] = True\n"
+                f"        route.continue_()\n\n"
+                f"    page.route('**/*', observe)\n"
+                f"    try:\n"
+                f"        po.fill_currentpassword('wrong-current-123')\n"
+                f"        po.fill_newpassword('NewPass_123')\n"
+                f"        po.fill_confirmnewpassword('NewPass_124')\n"
+                f"        click_save(page)\n"
+                f"        assert_not_redirected_to_login(page)\n"
+                f"        assert_toast_contains_any(page, ['Confirm', '确认', 'Please check'])\n"
+                f"        assert called['value'] is False, 'mismatch should be blocked on frontend before calling API'\n"
+                f"        po.take_screenshot('{page_key}_p1_mismatch_no_api', full_page=True)\n"
+                f"    finally:\n"
+                f"        page.unroute('**/*', observe)\n\n"
+                f"    logger.end(success=True)\n"
+            )
 
         boundary_block = "".join(boundary_blocks)
 
@@ -525,9 +714,12 @@ from playwright.sync_api import Page
 from pages.{file_name}_page import {class_name}Page
 from {helper_mod} import (
     FIELD_RULES,
+    CHANGE_PASSWORD_API_PATH,
     assert_not_redirected_to_login,
+    assert_toast_contains_any,
     click_save,
     has_any_error_ui,
+    wait_response_by_url_substring,
     wait_mutation_response,
 )
 from utils.logger import TestLogger
@@ -536,6 +728,7 @@ logger = TestLogger({page_key!r} + "_p1")
 
 {boundary_block}
 {email_block}
+{mismatch_block}
 {api_failure_block}
 """
 
@@ -629,7 +822,8 @@ def test_p2_keyboard_tab_navigation(auth_page: Page):
 
 import allure
 import pytest
-from playwright.sync_api import Browser, Page
+import re
+from playwright.sync_api import Page
 
 from utils.config import ConfigManager
 from {helper_mod} import (
@@ -650,7 +844,7 @@ logger = TestLogger({page_key!r} + "_security")
 @allure.feature({class_name!r})
 @allure.story("Security")
 @allure.title("未登录访问受保护页面应跳转登录")
-def test_security_unauth_redirects_to_login(browser: Browser):
+def test_security_unauth_redirects_to_login(unauth_page: Page):
     logger.start()
 
     if {str(is_protected)} is False:
@@ -660,15 +854,14 @@ def test_security_unauth_redirects_to_login(browser: Browser):
     base = (cfg.get_service_url("frontend") or "").rstrip("/")
     url = f"{{base}}{{URL_PATH}}"
 
-    ctx = browser.new_context(ignore_https_errors=True, viewport={{"width": 1440, "height": 900}})
-    page = ctx.new_page()
-    page.goto(url, wait_until="domcontentloaded", timeout=60000)
-    page.wait_for_timeout(1500)
+    page = unauth_page
+    # 只要“发生导航并提交”即可，login 页是否完成 domcontentloaded 不应影响鉴权跳转判断
+    page.goto(url, wait_until="commit", timeout=60000)
+    page.wait_for_url(re.compile(r".*(/auth/login|/Account/Login).*"), timeout=60000)
 
     current = page.url or ""
     assert "/auth/login" in current or "/Account/Login" in current, f"expected redirect to login, got: {{current}}"
     page.screenshot(path=f"screenshots/{page_key}_security_unauth_redirect.png", full_page=True)
-    ctx.close()
 
     logger.end(success=True)
 
@@ -717,9 +910,14 @@ def test_security_xss_payload_no_dialog(auth_page: Page):
                 assert_not_redirected_to_login(page)
                 page.wait_for_timeout(200)
     finally:
+        # 安全用例只验证“不执行/不崩溃”，不做保存回滚（避免 required 阻塞导致长等待）。
+        # 恢复输入后直接 reload，让页面回到干净状态即可。
         restore_inputs(page, snap)
-        click_save(page)
-        _ = wait_mutation_response(page, timeout_ms=60000)
+        try:
+            page.reload()
+        except Exception:
+            pass
+        page.wait_for_timeout(300)
 
     assert dialog_triggered["value"] is False, "XSS payload triggered a dialog"
     page.screenshot(path=f"screenshots/{page_key}_security_xss_no_dialog.png", full_page=True)

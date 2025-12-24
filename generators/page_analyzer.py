@@ -134,11 +134,21 @@ class PageAnalyzer:
                     auth_callback(page)
                 
                 # 导航到页面
-                page.goto(url, wait_until="networkidle", timeout=timeout_ms)
+                resp = page.goto(url, wait_until="networkidle", timeout=timeout_ms)
                 page.wait_for_timeout(2000)
 
                 # 可选：落盘动态分析产物（便于审计/复盘）
-                self._dump_artifacts(page, url=url, artifacts_dir=artifacts_dir)
+                try:
+                    status = resp.status if resp is not None else None
+                except Exception:
+                    status = None
+                self._dump_artifacts(
+                    page,
+                    requested_url=url,
+                    final_url=(page.url or ""),
+                    response_status=status,
+                    artifacts_dir=artifacts_dir,
+                )
                 
                 # 分析页面
                 page_info = self._analyze_page(page, url)
@@ -153,7 +163,15 @@ class PageAnalyzer:
     # Artifacts (dynamic snapshot)
     # ═══════════════════════════════════════════════════════════════
 
-    def _dump_artifacts(self, page: Page, *, url: str, artifacts_dir: Optional[str]) -> None:
+    def _dump_artifacts(
+        self,
+        page: Page,
+        *,
+        requested_url: str,
+        final_url: str,
+        response_status: Optional[int],
+        artifacts_dir: Optional[str],
+    ) -> None:
         """
         将动态分析的关键证据落盘，避免“黑盒分析”。
 
@@ -188,7 +206,9 @@ class PageAnalyzer:
                 logger.warning(f"写入 {name} 失败: {e}")
 
         try:
-            _safe_write_text("url.txt", (url or "") + "\n")
+            _safe_write_text("requested_url.txt", (requested_url or "") + "\n")
+            _safe_write_text("final_url.txt", (final_url or "") + "\n")
+            _safe_write_text("response_status.txt", (str(response_status) if response_status is not None else "") + "\n")
             _safe_write_text("title.txt", (page.title() or "") + "\n")
         except Exception:
             pass

@@ -6,15 +6,19 @@ BasePage - 所有页面对象的抽象基类
 提供统一的页面操作接口，子类只需关注业务逻辑
 """
 
-from playwright.sync_api import Page, Locator, expect
-from abc import ABC, abstractmethod
-from typing import Optional, List, Dict, Any
-from core.page_utils import PageUtils
+from typing import Optional
+
 from utils.logger import get_logger
-from utils.config import ConfigManager
 
 logger = get_logger(__name__)
 
+
+
+def _value_len(value: Optional[str]) -> int:
+    try:
+        return len(value or "")
+    except Exception:
+        return 0
 
 
 class PageActions:
@@ -40,12 +44,23 @@ class PageActions:
             value: 要填写的值
             timeout: 超时时间(毫秒)，默认30秒
         """
-        logger.debug(f"填写输入框: {selector} = {value}")
+        # 安全：禁止把用户输入值打进日志（可能包含密码/Token/PII）
+        logger.debug(f"填写输入框: {selector} (len={_value_len(value)})")
         # 先等待元素可见
         self.page.wait_for_selector(selector, state="visible", timeout=timeout)
         # 再等待元素可交互
         self.page.wait_for_selector(selector, state="attached", timeout=5000)
         # 填写
+        self.page.fill(selector, value, timeout=timeout)
+
+    def secret_fill(self, selector: str, value: str, timeout: int = 30000) -> None:
+        """
+        填写敏感输入框（例如密码），日志中不打印明文。
+        - 规则：只记录 selector，不记录 value
+        """
+        logger.debug(f"填写敏感输入框: {selector} = ***")
+        self.page.wait_for_selector(selector, state="visible", timeout=timeout)
+        self.page.wait_for_selector(selector, state="attached", timeout=5000)
         self.page.fill(selector, value, timeout=timeout)
     
     def clear_and_fill(self, selector: str, value: str, timeout: int = 10000) -> None:
@@ -57,7 +72,8 @@ class PageActions:
             value: 要填写的值
             timeout: 超时时间(毫秒)
         """
-        logger.debug(f"清空并填写: {selector} = {value}")
+        # 安全：禁止把用户输入值打进日志（可能包含密码/Token/PII）
+        logger.debug(f"清空并填写: {selector} (len={_value_len(value)})")
         element = self.page.locator(selector)
         element.clear()
         element.fill(value)
@@ -82,7 +98,8 @@ class PageActions:
             selector: 元素选择器
             value: 选项值
         """
-        logger.debug(f"选择选项: {selector} = {value}")
+        # 安全：避免把值打进日志（可能包含 PII）
+        logger.debug(f"选择选项: {selector} (len={_value_len(value)})")
         self.page.select_option(selector, value)
     
     def check(self, selector: str) -> None:

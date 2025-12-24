@@ -6,13 +6,12 @@
 
 本项目的核心是 **“URL → 动态分析 → 全量生成 → 执行 → 报告”** 的可复现链路。
 
-你可以用自然语言（`tools/ai_command_router.py`）或直接用 CLI（`tools/url_flow.py`）触发，框架会自动完成：
-- 检查/复用登录态（`storage_state`）
-- **Playwright 动态分析**（`generators/page_analyzer.py`）：真实打开页面，提取元素/可访问性快照（可选落盘）
-- 生成 Page Object（`pages/*_page.py`）
-- 生成测试套件（`tests/**`，含 P0/P1/P2/security 等）
-- 执行 pytest（默认只跑该 URL 对应套件目录）
-- 生成 Allure 报告（可选）
+你可以在 Cursor 中完成“页面分析/计划/代码生成”，然后用 **手动 pytest + allure** 完成执行与报告：
+- 执行：`make test TEST_TARGET=tests/...`
+- 报告：`make report` / `make serve`
+
+说明：
+- 历史上的一键入口已移除；仓库默认推荐手动流程（见 `docs/manual-workflow.md`）。
 
 ## 页面功能分析流程
 
@@ -35,10 +34,7 @@ playwright-test-scaffold/
 ├── pytest.ini                    # pytest 配置
 ├── requirements.txt              # 依赖清单
 │
-├── tools/                        # 官方可执行入口（强制走完整流程）
-│   ├── __init__.py
-│   ├── url_flow.py               # URL → 分析 → 全量生成 → pytest → allure
-│   └── ai_command_router.py      # 自然语言/URL → url_flow → 自动打开 Allure
+├── tools/                        # （已移除）历史一键脚本入口目录
 │
 ├── config/
 │   └── project.yaml              # 项目配置中心（仓库/服务/数据）
@@ -49,7 +45,8 @@ playwright-test-scaffold/
 │   ├── page_actions.py           # 页面操作封装
 │   ├── page_waits.py             # 页面等待策略
 │   ├── page_utils.py             # 页面工具函数
-│   └── fixtures.py                # pytest fixtures
+│   ├── fixtures.py               # pytest fixtures（门面：re-export，避免上帝文件）
+│   └── fixture/                  # fixtures 实现拆分（按职责）
 │
 ├── generators/                   # 代码生成引擎
 │   ├── __init__.py               # 模块导出入口
@@ -65,7 +62,7 @@ playwright-test-scaffold/
 │   │   ├── test_code_generator.py      # 测试代码生成器（协调器）
 │   │   ├── page_object_generator.py    # Page Object 生成器
 │   │   ├── test_case_generator.py      # 测试用例生成器
-│   │   ├── test_case_templates.py      # DEPRECATED: 历史遗留 TODO 模板（禁止作为生成路径）
+│   │   ├── (removed) test_case_templates.py  # 历史遗留 TODO 模板已移除（避免生成不可运行用例）
 │   │   └── test_data_generator.py      # 测试数据生成器
 │   │
 │   ├── 文档生成层
@@ -85,10 +82,17 @@ playwright-test-scaffold/
 │   └── service_checker.py        # 服务健康检查
 │
 ├── pages/                        # Page Object 实现层（生成）
-│   └── *_page.py
+│   ├── login_page.py             # 登录页对象（ABP /auth/login → /Account/Login）
+│   ├── personal_settings_page.py    # 个人设置页对象（示例/已有）
+│   └── *_page.py                 # 业务页面对象（生成）
 │
 ├── tests/                        # 测试用例层（生成）
-│   └── test_*.py
+│   ├── admin/
+│   │   └── profile/
+│   │       ├── profile_settings/            # 个人设置（已有）
+│   │       ├── change_password/             # 修改密码（新增）
+│   │       └── (page folders...)            # 按页面目录组织（每页面一个文件夹）
+│   └── test_*.py                             # 历史/示例（逐步收敛到按页面目录组织）
 │
 ├── test-data/                    # 测试数据
 │   ├── test_account_pool.json    # 测试账号池
@@ -96,12 +100,16 @@ playwright-test-scaffold/
 │
 ├── docs/                         # 文档
 │   ├── architecture.md           # 本文档
-│   ├── rules.yaml                # 可执行规则（生成/执行的结构化配置源）
+│   ├── rules.yaml                # 可执行规则（可选：缺失时 `utils/rules_engine.py` 会使用默认值）
 │   └── test-plans/               # 生成的测试计划
 │
 ├── reports/                      # 测试报告
 ├── screenshots/                  # 截图
 └── allure-results/               # Allure 数据
+#
+# Allure 结果缓存（跨模块多次运行的“最新汇总”）
+# - `.allure-cache/<suite_key>/allure-results`：每个 suite 只保留最新一次结果
+# - `allure-report/`：从所有 suite 最新结果生成的合并报告
 ```
 
 ## 模块职责
@@ -222,10 +230,10 @@ playwright-test-scaffold/
 ##### `generators/test_case_generator.py` (测试用例生成器)
 - **职责**: 生成测试用例代码
 - **方法**: `generate_test_cases()` - 生成测试用例代码
-- **依赖**: 不依赖 `TestCaseTemplates`（已废弃）；生成器应直接输出“可执行用例”并复用现有 fixtures
+- **依赖**: 不依赖 `TestCaseTemplates`（已移除）；生成器应直接输出“可执行用例”并复用现有 fixtures
 
 ##### `generators/test_case_templates.py` (测试用例模板)
-- **状态**: **DEPRECATED**
+- **状态**: **REMOVED**
 - **原因**: 历史上用于生成 TODO 骨架，容易产出“不可跑模板”，与当前规则冲突
 - **替代**: 使用 `TestCaseGenerator` / `TestCodeGenerator` 生成可执行套件（P0/P1/P2/security）
 
@@ -359,8 +367,9 @@ class BasePage(ABC, PageActions, PageWaits):
 | 2025-12-16 | 新增 `core/page_actions.py` 和 `core/page_waits.py` |
 | 2025-12-16 | 新增 `generators/page_types.py` 数据模型层 |
 | 2025-12-16 | 新增 `generators/element_extractor.py` 元素提取器 |
-| 2025-12-22 | `generators/test_case_templates.py` 标记为 DEPRECATED（禁止生成 TODO 骨架，统一产出可跑套件） |
+| 2025-12-22 | 移除 `generators/test_case_templates.py`（历史 TODO 模板，禁止作为生成路径） |
 | 2025-12-22 | 新增 `utils/rules_loader.py`：运行时加载 `.cursor/rules/**` 并落盘 `reports/rules_context.md`，让“生成过程调用 rule”可审计 |
+| 2025-12-23 | 新增 Change Password 套件（Page Object + suite + data，对齐 ABP policy 快照与回滚策略） |
 | 2025-12-16 | 新增 `generators/test_plan_formatter.py` 和 `test_plan_scenarios.py` |
 | 2025-12-15 | 新增服务健康检查模块 |
 | 2025-12-15 | 扩展配置结构（仓库/多环境/测试数据） |

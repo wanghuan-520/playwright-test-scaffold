@@ -1,0 +1,188 @@
+# UI 自动化代码生成规则（单文件入口版）
+
+> 目的：把“生成测试用例/页面对象/数据”的关键规则汇总到一个文件里，方便你只 `@` 这一个就够用。  
+> 原则：**汇总要点，不复制整套模块文档**（模块文档仍是更完整的“扩展阅读”）。
+
+## ✅ 快速用法（只看这几行就够）
+
+- **输入**：`docs/test-plans/<slug>.md`
+- **输出**：`pages/<slug>_page.py` + `tests/<module>/<page>/...` + `test-data/<slug>_data.json`
+- **Step3（手动执行）**：生成完代码后，你手动跑 pytest + allure（推荐直接用 Makefile）
+  - `make test TEST_TARGET=tests/<module>/<page>`
+  - `make report`
+  - `make serve`
+
+## 0. 输入与产物（对齐本仓库）
+
+- **输入**：测试计划 Markdown（推荐）  
+  - `docs/test-plans/<slug>.md`（例如：`docs/test-plans/admin_profile_change_password.md`）
+- **输出（必须对齐仓库结构）**
+  - **Page Object**：`pages/<slug>_page.py`（继承 `core/base_page.py:BasePage`）
+  - **测试用例**：`tests/<module>/<domain>/<page>/test_*.py`
+    - **硬规则：每个页面一个文件夹**（page folder）
+    - 例：`tests/admin/profile/change_password/test_*.py`
+    - 分层建议：`p0/p1/p2/security`（可裁剪；但不要把多个页面的用例平铺混在一个目录里）
+  - **测试数据**：`test-data/<slug>_data.json`
+
+## 1. 依赖规则（扩展阅读，不强制合并全文）
+
+当你需要更细的标准（断言、目录拆分、Allure 降噪、账号池），请同时参考这些模块规则：
+- `.cursor/rules/generation/code-generation.mdc`
+- `.cursor/rules/quality/test-case-standards.mdc`
+- `.cursor/rules/quality/allure-reporting.mdc`
+- `.cursor/rules/data/data-management.mdc`
+
+## 2. 生成策略（必须）
+
+### 2.1 解析测试计划（来源：`docs/test-plans/<slug>.md`）
+
+必须从计划里提取：
+- **URL / 页面类型 / 是否需要登录态**
+- **元素映射表**（元素类型、语义、定位器）
+- **测试用例列表**（TC001/TC002… 的意图、优先级、断言层级）
+- **测试数据**（valid/invalid/boundary）
+
+### 2.1.5 规则输入（条件优先：快照 > 代码识别 > 计划降级；仅重矩阵允许 skip）
+
+原则：**能从真理源拿规则就拿**，拿不到再推导；推导也拿不到才降级。  
+注意：降级只影响“阈值/矩阵”，**不应连带跳过关键业务校验用例**（例如 confirm mismatch）。
+
+#### 优先级 1：后端快照（如果存在就必须优先消费）
+
+当存在以下 artifacts 时，**Step2 必须优先使用它们生成可执行用例与数据**（禁止先生成 TBD 再补）：
+- `docs/test-plans/artifacts/<slug>/abp_app_config.json`
+- `docs/test-plans/artifacts/<slug>/abp_swagger.json`
+- `docs/test-plans/artifacts/<slug>/abp_rules_extract.json`
+
+要求（必须）：
+- **PasswordPolicy 矩阵必须可运行**：从 `settings.values` 推导 requiredLength/requireDigit/...，生成 `missing_digit / missing_uppercase / too_short ...` 等参数化用例。
+- DTO 约束优先来自 swagger（minLength/maxLength/pattern/required），避免前端文案漂移导致用例失真。
+
+#### 优先级 2：代码识别（仅当仓库可读且能定位证据）
+
+当快照缺失/解析失败时，允许尝试从代码中识别规则：
+- 后端：Identity/PasswordOptions/DTO 注解/FluentValidation 等
+- 前端：表单 schema / validator / 正则 / i18n 文案来源
+
+要求：
+- 推导必须附带“证据来源”（文件路径/片段/关键字段名），并保持脱敏（禁止写入任何真实密码/凭证）。
+
+同时，如果 Step1 已生成并落盘：
+- `docs/test-plans/artifacts/<slug>/code_rules_extract.json`
+
+则 Step2 必须优先读取并复用其中的规则摘要（因为它已经是“可审计的推导结果”），避免重复猜测。
+
+#### 优先级 3：计划降级（可运行优先，不硬猜阈值）
+
+若快照与代码识别都不可用：
+- 用例仍需覆盖**基础可观察行为**（必填、格式、confirm mismatch、未授权拦截、安全最小集）
+- 对“需要具体阈值”的重矩阵（例如 PasswordPolicy 全矩阵、min/max 边界全集）：
+  - 允许 `pytest.skip`，但必须写明：缺失哪些输入（快照文件/key、或缺少代码证据）
+  - **禁止硬猜阈值**：不要写死 requiredLength/maxLength/regex
+
+### 2.2 定位器规则（稳定性优先）
+
+- **优先级**：role/name、label、data-testid > aria-* > 语义 CSS > 结构 CSS（最后手段）
+- **注意**：本仓库 `BasePage` 的 `click/fill/is_visible` 使用的是 **selector 字符串**，不是 `page.get_by_role(...)` 这种 Python 调用表达式。
+  - 如果计划里写了 `page.get_by_role("button", name="Save")`，代码里应转换为 selector：`role=button[name="Save"]`
+  - `page.locator("...")` 则直接取里面的 `"..."` 作为 selector
+
+## 3. Page Object 规范（必须）
+
+### 3.1 基础骨架（对齐 `core/base_page.py`）
+
+```python
+from core.base_page import BasePage
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+# ============================================================
+# 页面对象：<PageName>Page
+# - 目标：封装稳定定位器与业务操作
+# - 原则：短小、直白、少分支
+# ============================================================
+class <PageName>Page(BasePage):
+    # SELECTORS（优先 role/label/testid；必要时提供 CSS 兜底）
+    CURRENT_PASSWORD_INPUT = "[name='currentPassword']"
+    NEW_PASSWORD_INPUT = "[name='newPassword']"
+    CONFIRM_PASSWORD_INPUT = "[name='confirmNewPassword']"
+    SAVE_BUTTON = 'role=button[name="Save"]'
+
+    URL = "/admin/profile/change-password"
+    page_loaded_indicator = "[name='currentPassword']"
+
+    def navigate(self) -> None:
+        self.goto(self.URL)
+        self.wait_for_page_load()
+
+    def is_loaded(self) -> bool:
+        return self.is_visible(self.page_loaded_indicator, timeout=5000)
+
+    # ACTIONS（一个方法只做一件事）
+    def change_password(self, current: str, new: str, confirm: str) -> None:
+        self.fill(self.CURRENT_PASSWORD_INPUT, current)
+        self.fill(self.NEW_PASSWORD_INPUT, new)
+        self.fill(self.CONFIRM_PASSWORD_INPUT, confirm)
+        self.click(self.SAVE_BUTTON)
+```
+
+### 3.2 敏感字段（密码）硬规则：禁止用 `BasePage.fill`
+
+本仓库当前 `PageActions.fill()` 会把 value 写入 debug 日志，因此对密码字段必须：
+- 直接使用 `self.page.fill(...)` 并且日志只打 `***`
+- 或封装 `secret_fill()` 方法统一处理（推荐）
+
+否则会造成日志泄露，违反安全约束。
+
+## 4. 测试用例生成规范（必须，合并关键点）
+
+### 4.1 用例分层（marker）
+
+- `pytest.mark.P0`：主链路（page load + happy path；写操作必须可回滚）
+- `pytest.mark.P1`：输入校验/边界/异常（建议字段矩阵拆分）
+- `pytest.mark.P2`：可用性/UI/a11y（最小集合即可）
+- `pytest.mark.security`：安全维度（建议与 P1 叠加：`P1 + security`）
+
+### 4.2 fixture 选择（对齐本仓库）
+
+- `/admin/*` 默认需要登录态：**测试用例优先使用 `auth_page` fixture**
+- 未登录拦截类用例：使用 `unauth_page`
+
+### 4.2.5 账号来源（必须写清楚，默认走账号池）
+
+生成的测试代码必须遵循以下“账号来源”规则（避免执行时账号不一致/凭证泄露）：
+
+- **默认（强制）**：测试运行时账号必须来自账号池（`test-data/test_account_pool.json` → `DataManager`）。
+  - 代码侧体现为：使用仓库既有 fixture 获取账号与登录态：
+    - `test_account`（autouse，提供账号对象）
+    - `auth_page`（已登录页面；xdist 下会为每个 worker 从账号池挑账号生成 `storage_state`）
+    - `session_test_account`（当 `REUSE_LOGIN` 生效时，`test_account` 会复用与 `auth_page` 一致的 worker 会话账号）
+- **禁止**：在生成的测试代码中写死用户名/密码、或从对话输入直接注入凭证到用例。
+- **用户提供的账号/密码**：仅用于 Step1 页面分析/规则快照（MCP），**不作为 Step2 测试代码的默认账号来源**。
+- **如果确实需要“固定账号”跑用例**（可选能力）：
+  - 必须通过环境变量/外部注入方式实现（例如 `E2E_USERNAME/E2E_PASSWORD`），且仍不得把密码写入任何文件；
+  - 未显式启用时，仍以账号池为默认。
+
+### 4.3 断言口味（少噪声、可诊断）
+
+- **必须有真实断言**（不能只有 logger/checkpoint）
+- 校验类用例：优先断言结构/状态（`aria-invalid`、disabled、可见错误区域），避免绑死易变文案
+- “应被前端拦截”的输入：应尽量断言 **不触发提交**（必要时结合 request 监听）
+
+## 5. 测试数据生成（必须）
+
+输出到：`test-data/<slug>_data.json`
+
+结构必须包含：
+- `valid`: 正常数据（P0 只用正常数据，避免超长 baseline 污染报告）
+- `invalid`: 非法/异常数据（必填缺失、格式错误、业务冲突）
+- `boundary`: 边界数据（min-1/min/min+1/max-1/max/max+1 的代表性集合）
+
+## 6. 代码生成输出要求（必须）
+
+1. 生成 Page Object（继承 `BasePage`，封装业务动作）
+2. 生成 tests suite（至少 `p0/p1/p2/security` 结构可裁剪，但不要扁平堆根目录）
+3. 生成 test-data JSON（valid/invalid/boundary）
+4. 生成代码必须可重复运行（写操作必须可回滚，避免污染账号池）

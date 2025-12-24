@@ -27,8 +27,8 @@ cp test-data/test_account_pool.json.example test-data/test_account_pool.json
     {
       "username": "testuser01",
       "email": "testuser01@example.com",
-      "password": "YourPassword123!",
-      "initial_password": "YourPassword123!",
+      "password": "<provided_at_runtime>",
+      "initial_password": "<provided_at_runtime>",
       "in_use": false,
       "last_used": null,
       "is_locked": false

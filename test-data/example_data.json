@@ -5,12 +5,12 @@
   },
   "valid_data": {
     "username": "testuser",
-    "password": "TestPass123!",
+    "password_env": "TEST_ACCOUNT_PASSWORD",
     "email": "test@example.com"
   },
   "invalid_data": {
     "username": "",
-    "password": "123",
+    "password_literal": "__TOO_SHORT__",
     "email": "invalid-email"
   },
   "boundary_data": {
@@ -35,12 +35,12 @@
     "default": {
       "username": "testuser",
       "email": "test@example.com",
-      "password": "TestPass123!"
+      "password_env": "TEST_ACCOUNT_PASSWORD"
     },
     "admin": {
       "username": "admin",
       "email": "admin@example.com",
-      "password": "AdminPass123!"
+      "password_env": "TEST_ADMIN_PASSWORD"
     }
   }
 }

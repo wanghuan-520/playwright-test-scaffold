@@ -72,6 +72,7 @@ analysis/
 tmp/
 temp/
 *.tmp
+.tmp_abp/
 
 # Local env marker (created by fixtures to indicate environment readiness)
 .tmp_env_ready
@@ -79,4 +80,5 @@ temp/
 # Lock / backup files (runtime)
 *.lock
 *.backup
+*.backup.*
 

@@ -61,7 +61,11 @@ class BasePage(ABC, PageActions, PageWaits):
         url = path if path.startswith("http") else f"{self.base_url}{path}"
         logger.info(f"导航到: {url}")
         
-        self.page.goto(url)
+        # SPA / 长轮询场景下，等待 "load" 容易卡死（资源持续加载/连接不断开）
+        # 默认用 domcontentloaded，更符合“页面可交互”的定义。
+        wait_until = os.getenv("PAGE_GOTO_WAIT_UNTIL", "domcontentloaded").strip() or "domcontentloaded"
+        timeout_ms = int(os.getenv("PAGE_GOTO_TIMEOUT_MS", "60000"))
+        self.page.goto(url, wait_until=wait_until, timeout=timeout_ms)
         
         if wait_for_load:
             self.wait_for_page_load()

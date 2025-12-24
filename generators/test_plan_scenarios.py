@@ -28,6 +28,7 @@ from generators.utils import (
     get_file_name_from_url,
     get_tc_prefix_from_url,
     extract_url_path,
+    get_element_name,
     get_element_constant_name,
     get_element_comment,
 )

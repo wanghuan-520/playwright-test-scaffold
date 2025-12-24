@@ -28,8 +28,12 @@ from generators.utils import (
     get_file_name_from_url,
     get_tc_prefix_from_url,
     extract_url_path,
+    get_element_name,
+    get_element_description,
     get_element_constant_name,
     get_element_comment,
+    get_page_description,
+    requires_auth,
 )
 from utils.logger import get_logger
 
@@ -39,6 +43,19 @@ logger = get_logger(__name__)
 
 class TestPlanFormatter:
     """测试计划格式化器"""
+
+    # ═══════════════════════════════════════════════════════════════
+    # Test dimensions (用于计划概述展示，不参与执行)
+    # ═══════════════════════════════════════════════════════════════
+    TEST_DIMENSIONS = {
+        "LOGIN": ["functional", "security", "accessibility"],
+        "REGISTER": ["functional", "security", "accessibility"],
+        "FORM": ["functional", "validation", "security"],
+        "LIST": ["functional", "ui", "performance"],
+        "DETAIL": ["functional", "ui"],
+        "DASHBOARD": ["functional", "ui", "performance"],
+        "SETTINGS": ["functional", "validation", "security", "accessibility"],
+    }
 
     def _infer_max_len(self, elem: PageElement):
         # DOM attributes 可能来自不同风格：maxlength / maxLength
