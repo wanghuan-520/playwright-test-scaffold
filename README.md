@@ -152,40 +152,26 @@ AI 将**全自动完成**：
 
 ## 🧭 入口选择（建议从这里开始）
 
-本项目有 3 个“官方入口”，按使用场景选择即可：
-
-| 入口 | 什么时候用 | 做了什么 |
-|------|------------|----------|
-| `python3 -m tools.url_flow --url "<url>" -- <pytest_args...>` | **推荐默认**：测试某个页面/功能 | 强制走 **分析→全量生成→pytest→allure generate** |
-| `python3 -m tools.ai_command_router <一句话/URL> -- <pytest_args...>` | 想“一句话就跑起来” | 解析 URL/别名 → 调 `url_flow`；或识别“回归/全系统”→ 直接跑 `pytest`；最后用 `http.server` 打开报告 |
-| `python3 -m tools.test_flow --suite <key> -- <pytest_args...>` | 多目录分开跑、但希望总报告展示“各目录最后一次” | suite 结果缓存 + 合并结果 + 生成/打开报告 |
-
-常用示例：
+如果你已经明确要“手动 pytest + allure”，建议优先用下面这个最短路径（不依赖任何 flow 脚本）：
 
 ```bash
-# 页面级全链路（推荐）
-python3 -m tools.url_flow --url "https://localhost:3000/admin/profile/change-password"
+# 1) 跑测试（建议按目录跑）
+make test TEST_TARGET=tests/admin/profile
 
-# 自然语言（会从 docs/requirements.md 解析“页面别名 → 路由”）
-python3 -m tools.ai_command_router 测试下 修改密码页面
+# 2) 生成报告
+make report
 
-# 透传 pytest 参数（示例：只跑 P0/P1，并发 4）
-python3 -m tools.ai_command_router 测试下 修改密码页面 -- -m "P0 or P1" -n 4
+# 3) 打开报告
+make serve
 ```
 
-### 🧩 多目录运行：希望“之前的报告还在”（合并各目录最后一次结果）
+完整说明见：`docs/manual-workflow.md`。
 
-如果你要先跑 `tests/admin/profile`，再跑 `tests/admin/profile_change_password`，并希望最终报告里同时保留两者（各自最后一次），请用：
+---
 
-```bash
-# 第一次：跑 profile（suite 自动从目标路径推断为 profile）
-python3 -m tools.test_flow -- tests/admin/profile
-
-# 第二次：跑 profile_change_password（suite 自动推断）
-python3 -m tools.test_flow -- tests/admin/profile_change_password
-```
-
-> 机制：每次运行把结果写到 `.allure-cache/<suite>/allure-results`（覆盖该 suite 的旧结果），再把所有 suite 的最新结果合并生成一个总 `allure-report`。
+说明：
+- 过去的 `tools/*flow.py` 一键流入口已移除（避免入口噪音与维护负担）。
+- 当前推荐流程就是：`make test` → `make report` → `make serve`（见上文与 `docs/manual-workflow.md`）。
 
 ---
 
@@ -201,36 +187,68 @@ python3 -m tools.test_flow -- tests/admin/profile_change_password
 
 ---
 
-## ✅ 官方“必选”流程：URL → 分析 → 全量生成 → 执行 → 报告
+## ✅ 推荐流程（手动）：pytest → allure
 
-为了避免“只跑旧代码/旧选择器/旧规则”的漂移，本框架把 **页面分析 + 全量生成** 视为默认必选步骤。
-
-你也可以直接用命令行强制走全链路（推荐用于 CI/本地一键复现）：
+为了避免“一键脚本魔法”带来的不可控，本项目默认推荐手动跑：
 
 ```bash
-python3 -m tools.url_flow --url "https://localhost:3000/admin/profile/change-password"
-
-# 透传 pytest 参数（示例：只跑 P0/P1，并发 4）
-python3 -m tools.url_flow --url "https://localhost:3000/admin/profile/change-password" -- -m "P0 or P1" -n 4
+make test TEST_TARGET=tests/admin/profile
+make report
+make serve
 ```
 
 ---
 
-## 🗣️ 一句话触发全流程（命令路由器）
+## 🧠 Allure「分模块多次运行」的最新汇总报告（推荐）
 
-如果你希望输入自然语言就自动跑完整链路（分析→生成→执行→报告并打开），用：
+目标：
+- 同一个模块（suite）重复跑：Allure 报告里只保留该模块的**最新一次结果**
+- 跑不同模块后：`make report` 生成的是“各模块最新结果合集”的**完整新报告**
+
+实现方式：
+- 每个 suite 的最新 `allure-results` 会被缓存到：`.allure-cache/<suite_key>/allure-results`
+- `make report` 会从所有缓存 suite 生成一个合并报告到：`allure-report/`
+
+用法：
 
 ```bash
-python3 -m tools.ai_command_router 测试下 修改密码页面
+# 先跑模块 A（suite_key 可省略，默认用 TEST_TARGET 生成）
+make test TEST_TARGET=tests/admin/profile/profile_settings
 
-# 或者直接给 URL
-python3 -m tools.ai_command_router 测试下 https://localhost:3000/admin/profile/change-password
+# 再跑模块 B（覆盖 B 的最新结果，但 A 的最新结果仍保留）
+make test TEST_TARGET=tests/some/other/module
 
-# 透传 pytest 参数
-python3 -m tools.ai_command_router 测试下 修改密码页面 -- -m "P0 or P1" -n 4
+# 生成“全量最新汇总”报告
+make report
+
+# 打开报告（本地 http server）
+make serve
 ```
 
-页面别名映射维护在：`docs/requirements.md` → “页面别名 → 路由”。
+可选：
+- **指定 suite_key**（当你希望多个 target 归为同一个 suite 时）：
+  - `make test TEST_TARGET=tests/admin/profile SUITE_KEY=admin_profile`
+- **清空缓存**：
+  - `make clean-cache`
+
+---
+
+## 🗣️ 关于自然语言/路由器
+
+历史上的 `tools/*` 一键入口已移除（避免“一键魔法”带来的不可控与维护负担），当前默认使用手动流程。
+
+### 🎯 MCP-first：先用 Cursor Playwright MCP 分析，再手动跑 pytest
+
+现实约束（必须接受）：
+- Cursor 的 Playwright MCP 是“编辑器侧工具会话”，Python 进程无法直接触发订阅。
+- 本框架支持 **桥接模式**：读取 **MCP 导出的 PageInfo JSON** 来生成/执行测试。
+
+使用方式：
+- **Step 1（一次性）**：在 Cursor 的 Playwright MCP 中对目标页面做分析，并把 PageInfo JSON 导出到默认路径：
+  - `test-data/mcp_pageinfo_cache/admin_profile_change_password_pageinfo.json`
+  - 或通过环境变量指定：`PT_MCP_PAGEINFO_PATH=/abs/path/to/pageinfo.json`
+- **Step 2**：让 AI 基于测试计划生成代码（`pages/` + `tests/` + `test-data/`）
+- **Step 3**：你手动 `make test/make report/make serve`
 
 ---
 
@@ -312,7 +330,8 @@ python3 -m tools.ai_command_router 测试下 修改密码页面 -- -m "P0 or P1"
 | 分析类型 | 优势 | 局限 |
 |----------|------|------|
 | **GitHub 代码分析** | ✅ 理解业务逻辑<br>✅ 提取验证规则<br>✅ 获取 API 接口 | ❌ 无法获取动态生成的元素<br>❌ 无法知道实际渲染状态 |
-| **Playwright MCP 分析** | ✅ 获取实际渲染的元素<br>✅ 知道元素的交互状态<br>✅ 可访问性信息完整 | ❌ 无法理解业务逻辑<br>❌ 无法知道验证规则 |
+| **Playwright 动态分析（默认：sync_playwright）** | ✅ CLI/CI 可跑<br>✅ 自动落盘证据（DOM/截图/a11y）<br>✅ 行为可控（headless/timeout） | ❌ 依赖运行环境浏览器/权限 |
+| **Playwright MCP（离线复用：导出 JSON → 读取）** | ✅ 编辑器里交互式抓取更直观<br>✅ 可把 PageInfo JSON 多次复用生成 | ❌ Python 进程无法直接调用 MCP 会话（需先导出 JSON） |
 | **🎯 双重分析（互补）** | ✅✅ **结合两者优势，生成最准确的测试用例** | - |
 
 ### 分析示例
@@ -327,11 +346,15 @@ GitHub 代码分析（静态）
       ├─ API 接口: POST /api/user/change-password
       └─ 业务逻辑: 新密码不能与当前密码相同
   ↓
-Playwright MCP 分析（动态）
-  └─ 实时访问 https://localhost:3000/admin/profile/change-password
-      ├─ 实际元素: #currentPassword, #newPassword, #confirmPassword
-      ├─ 元素状态: required=true, disabled=false
-      └─ 可访问性: role="textbox", name="当前密码"
+Playwright 动态分析（默认：sync_playwright）
+  └─ 由 `generators/page_analyzer.py` 打开页面并提取元素/可访问性快照（当你选择走“脚本分析”时）
+      ├─ 实际元素: [name='currentPassword'], [name='newPassword'], ...
+      ├─ 元素状态: required/disabled/visible
+      └─ 可访问性: a11y snapshot（结构化）
+  
+Playwright MCP（离线复用：导出 JSON → 读取）
+  └─ 在 Cursor/Playwright MCP 中导出 PageInfo JSON
+      ├─ 然后把 JSON 作为输入交给 AI（用于生成测试计划/代码）
   ↓
 合并分析结果
   └─ 生成完整的 PageInfo 对象
@@ -352,18 +375,14 @@ Playwright MCP 分析（动态）
 playwright-test-scaffold/
 ├── .cursor/rules/              # AI 规则系统（模块化）
 │   ├── core/                   # 核心规则
-│   │   └── project-overview.md
-│   ├── workflow/               # 工作流规则
-│   │   ├── analysis-and-generation.md
-│   │   ├── test-execution.md
-│   │   └── ai-commands.md
+│   │   └── project-overview.mdc
 │   ├── generation/             # 代码生成规则
-│   │   └── code-generation.md
+│   │   └── code-generation.mdc
 │   ├── quality/                # 质量标准
-│   │   ├── allure-reporting.md
-│   │   └── test-case-standards.md
+│   │   ├── allure-reporting.mdc
+│   │   └── test-case-standards.mdc
 │   └── data/                   # 数据管理规则
-│       └── data-management.md
+│       └── data-management.mdc
 │
 ├── config/
 │   └── project.yaml            # 项目配置中心
@@ -581,7 +600,7 @@ allure open allure-report
 | 必须包含特殊字符 | `RequireNonAlphanumeric` | `test_p1_password_missing_special_char` |
 | 唯一字符数要求 | `RequiredUniqueChars` | `test_p1_password_insufficient_unique_chars` |
 
-项目独有规则：`docs/requirements.md`
+项目独有规则：`docs/requirements/requirements.md`
 
 ---
 
@@ -623,8 +642,8 @@ refactor(utils): 简化 ServiceChecker 逻辑
 |------|------|
 | [架构设计](docs/architecture.md) | 完整的架构说明、设计模式、模块职责 |
 | [测试流程](docs/test-workflow.md) | 详细的测试流程图、数据流转 |
-| [规则系统](.cursor/rules/README.md) | AI 规则系统的模块化管理 |
-| 项目规则 | `docs/requirements.md` | Aevatar 项目特定规则 |
+| [规则系统](.cursor/README.md) | AI 规则系统的最简入口与关系图 |
+| 项目规则 | `docs/requirements/requirements.md` | Aevatar 项目特定规则 |
 
 ---
 

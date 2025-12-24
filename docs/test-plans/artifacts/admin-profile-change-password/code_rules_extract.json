@@ -1,0 +1,76 @@
+{
+  "note": "规则摘要（来自前后端代码/契约），不包含任何用户密码/凭证。",
+  "frontend": {
+    "repo_path": "/Users/wanghuan/aelf/Aevatar/aevatar-agent-station-frontend",
+    "route": {
+      "path": "/admin/profile/change-password",
+      "evidence": {
+        "file": "src/app/admin/profile/change-password/page.tsx",
+        "summary": "页面渲染 ChangePassword 组件 + Tabs（Personal Settings / Change Password）。"
+      }
+    },
+    "form_logic": {
+      "evidence": {
+        "file": "src/components/profile/ChangePassword.tsx",
+        "summary": [
+          "currentPassword Input: required（HTML5 constraint validation）。",
+          "newPassword/confirmNewPassword: shouldDisabled() 仅校验非空且一致；失败则 toast 并 return（不发请求）。",
+          "提交成功/失败：toast Success/Failed（文案可能漂移，测试避免强绑定）。"
+        ]
+      }
+    },
+    "api_client": {
+      "function": "profileChangePassword",
+      "method": "POST",
+      "url": "/api/account/my-profile/change-password",
+      "evidence": {
+        "file": "src/client/sdk.gen.ts",
+        "summary": "OpenAPI 生成 SDK：profileChangePassword -> POST /api/account/my-profile/change-password，Content-Type: application/json。"
+      }
+    }
+  },
+  "backend_contract": {
+    "source": "swagger",
+    "artifact": "backend_swagger.json",
+    "endpoint": {
+      "method": "POST",
+      "url": "/api/account/my-profile/change-password",
+      "tag": "Profile",
+      "responses": {
+        "200": "OK",
+        "400": "RemoteServiceErrorResponse",
+        "401": "RemoteServiceErrorResponse",
+        "403": "RemoteServiceErrorResponse",
+        "404": "RemoteServiceErrorResponse",
+        "500": "RemoteServiceErrorResponse",
+        "501": "RemoteServiceErrorResponse"
+      },
+      "evidence_path": "$.paths['/api/account/my-profile/change-password'].post"
+    },
+    "dto": {
+      "name": "Volo.Abp.Account.ChangePasswordInput",
+      "required": ["newPassword"],
+      "properties": {
+        "currentPassword": {
+          "type": "string",
+          "nullable": true,
+          "minLength": 0,
+          "maxLength": 128
+        },
+        "newPassword": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 128
+        }
+      },
+      "additionalProperties": false,
+      "evidence_path": "$.components.schemas['Volo.Abp.Account.ChangePasswordInput']"
+    },
+    "error_shape_hint": {
+      "name": "Volo.Abp.Http.RemoteServiceErrorResponse",
+      "note": "ABP 标准错误体，常见字段：error.code/message/details/validationErrors[].members/message（具体结构以 swagger 为准）。"
+    }
+  }
+}
+
+

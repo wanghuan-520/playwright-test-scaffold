@@ -1,0 +1,947 @@
+{
+  "source": {
+    "endpoint": "GET https://localhost:3000/api/abp/application-configuration",
+    "captured_via": "curl (no browser auth cookies)",
+    "artifact": "abp_app_config.json",
+    "http_headers_artifact": "abp_app_config_headers.txt"
+  },
+  "note": "本文件仅为规则摘要；不包含任何用户密码/凭证/Token。",
+  "password_policy": {
+    "evidence_path": "$.setting.values[\"Abp.Identity.Password.*\"]",
+    "Abp.Identity.Password.RequiredLength": 6,
+    "Abp.Identity.Password.RequiredUniqueChars": 1,
+    "Abp.Identity.Password.RequireDigit": true,
+    "Abp.Identity.Password.RequireLowercase": true,
+    "Abp.Identity.Password.RequireUppercase": true,
+    "Abp.Identity.Password.RequireNonAlphanumeric": true,
+    "Abp.Identity.Password.ForceUsersToPeriodicallyChangePassword": false,
+    "Abp.Identity.Password.PasswordChangePeriodDays": 0
+  },
+  "localization_hints": {
+    "AbpIdentity.DisplayName:CurrentPassword": "Current password",
+    "AbpIdentity.DisplayName:NewPassword": "New password",
+    "AbpIdentity.DisplayName:NewPasswordConfirm": "Confirm new password",
+    "AbpIdentity.Volo.Abp.Identity:PasswordMismatch": "Incorrect password.",
+    "AbpIdentity.Volo.Abp.Identity:PasswordConfirmationFailed": "Password does not match the confirm password.",
+    "AbpIdentity.Volo.Abp.Identity:PasswordTooShort": "Passwords must be at least {0} characters.",
+    "AbpIdentity.Volo.Abp.Identity:PasswordRequiresDigit": "Passwords must have at least one digit ('0'-'9').",
+    "AbpIdentity.Volo.Abp.Identity:PasswordRequiresLower": "Passwords must have at least one lowercase ('a'-'z').",
+    "AbpIdentity.Volo.Abp.Identity:PasswordRequiresUpper": "Passwords must have at least one uppercase ('A'-'Z').",
+    "AbpIdentity.Volo.Abp.Identity:PasswordRequiresNonAlphanumeric": "Passwords must have at least one non alphanumeric character.",
+    "AbpIdentity.Volo.Abp.Identity:PasswordRequiresUniqueChars": "Passwords must use at least {0} different characters."
+  },
+  "swagger_status": {
+    "abp_swagger.json": {
+      "url": "https://localhost:3000/swagger/v1/swagger.json",
+      "result": "307 redirect",
+      "headers_artifact": "swagger_headers.txt",
+      "body_artifact": "abp_swagger.json"
+    },
+    "abp_swagger_alt.json": {
+      "url": "https://localhost:3000/api/swagger/v1/swagger.json",
+      "result": "404",
+      "headers_artifact": "swagger_alt_headers.txt",
+      "body_artifact": "abp_swagger_alt.json"
+    }
+  }
+}
+
+{
+  "source": "GET https://localhost:3000/api/abp/application-configuration (captured via curl without auth cookies)",
+  "note": "Extract only; NO user passwords/credentials.",
+  "hits": [
+    {
+      "path": "$.localization.values.AbpUi.ChangePassword",
+      "value": "Change password"
+    },
+    {
+      "path": "$.localization.values.AbpFeatureManagement.ChangePassword",
+      "value": "Change password"
+    },
+    {
+      "path": "$.localization.values.AbpPermissionManagement.ChangePassword",
+      "value": "Change password"
+    },
+    {
+      "path": "$.localization.values.AbpSettingManagement.ChangePassword",
+      "value": "Change password"
+    },
+    {
+      "path": "$.localization.values.AbpSettingManagement.SmtpPassword",
+      "value": "Password"
+    },
+    {
+      "path": "$.localization.values.AbpSettingManagement.SmtpPasswordPlaceholder",
+      "value": "Enter a value to update password"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity",
+      "type": "dict"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.ChangePassword",
+      "value": "Change password"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Menu:IdentityManagement",
+      "value": "Identity management"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Password",
+      "value": "Password"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.DisplayName:Password",
+      "value": "Password"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.DisplayName:CurrentPassword",
+      "value": "Current password"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.DisplayName:NewPassword",
+      "value": "New password"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.DisplayName:NewPasswordConfirm",
+      "value": "Confirm new password"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.PasswordChangedMessage",
+      "value": "Your password has been changed successfully."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:DefaultError",
+      "value": "An unknown failure has occurred."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:ConcurrencyFailure",
+      "value": "Optimistic concurrency check has been failed. The entity you're working on has modified by another user. Please discard your changes and try again."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:DuplicateEmail",
+      "value": "Email '{0}' is already taken."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:DuplicateRoleName",
+      "value": "Role name '{0}' is already taken."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:DuplicateUserName",
+      "value": "Username '{0}' is already taken."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:InvalidEmail",
+      "value": "Email '{0}' is invalid."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:InvalidPasswordHasherCompatibilityMode",
+      "value": "The provided PasswordHasherCompatibilityMode is invalid."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:InvalidPasswordHasherIterationCount",
+      "value": "The iteration count must be a positive integer."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:InvalidRoleName",
+      "value": "Role name '{0}' is invalid."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:InvalidToken",
+      "value": "Invalid token."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:InvalidUserName",
+      "value": "Username '{0}' is invalid."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:LoginAlreadyAssociated",
+      "value": "A user with this login already exists."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:PasswordMismatch",
+      "value": "Incorrect password."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:PasswordRequiresDigit",
+      "value": "Passwords must have at least one digit ('0'-'9')."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:PasswordRequiresLower",
+      "value": "Passwords must have at least one lowercase ('a'-'z')."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:PasswordRequiresNonAlphanumeric",
+      "value": "Passwords must have at least one non alphanumeric character."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:PasswordRequiresUpper",
+      "value": "Passwords must have at least one uppercase ('A'-'Z')."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:PasswordTooShort",
+      "value": "Passwords must be at least {0} characters."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:PasswordRequiresUniqueChars",
+      "value": "Passwords must use at least {0} different characters."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:RoleNotFound",
+      "value": "Role {0} does not exist."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:UserAlreadyHasPassword",
+      "value": "User already has a password set."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:UserAlreadyInRole",
+      "value": "User already in role '{0}'."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:UserLockedOut",
+      "value": "User is locked out."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:UserLockoutNotEnabled",
+      "value": "Lockout is not enabled for this user."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:UserNameNotFound",
+      "value": "User {0} does not exist."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:UserNotInRole",
+      "value": "User is not in role '{0}'."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:PasswordConfirmationFailed",
+      "value": "Password does not match the confirm password."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:NullSecurityStamp",
+      "value": "User security stamp cannot be null."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:RecoveryCodeRedemptionFailed",
+      "value": "Recovery code redemption failed."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:010001",
+      "value": "You can not delete your own account!"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:010002",
+      "value": "Can not set more than {MaxUserMembershipCount} organization unit for a user!"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:010003",
+      "value": "Can not change password of an externally logged in user!"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:010004",
+      "value": "There is already an organization unit with name {0}. Two units with same name can not be created in same level."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:010005",
+      "value": "Static roles can not be renamed."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:010006",
+      "value": "Static roles can not be deleted."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:010007",
+      "value": "You can't change your two factor setting."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:010008",
+      "value": "It's not allowed to change two factor setting."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:010009",
+      "value": "You can not delegate yourself."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:010021",
+      "value": "Name exist: '{0}'."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:010022",
+      "value": "Can not update a static ClaimType."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Volo.Abp.Identity:010023",
+      "value": "Can not delete a static ClaimType."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Identity.OrganizationUnit.MaxUserMembershipCount",
+      "value": "Maximum allowed organization unit membership count for a user"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Permission:IdentityManagement",
+      "value": "Identity management"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.DisplayName:Abp.Identity.Password.RequiredLength",
+      "value": "Required length"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.DisplayName:Abp.Identity.Password.RequiredUniqueChars",
+      "value": "Required unique characters number"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.DisplayName:Abp.Identity.Password.RequireNonAlphanumeric",
+      "value": "Required non-alphanumeric character"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.DisplayName:Abp.Identity.Password.RequireLowercase",
+      "value": "Required lower case character"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.DisplayName:Abp.Identity.Password.RequireUppercase",
+      "value": "Required upper case character"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.DisplayName:Abp.Identity.Password.RequireDigit",
+      "value": "Required digit"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.DisplayName:Abp.Identity.Password.ForceUsersToPeriodicallyChangePassword",
+      "value": "Force users to periodically change password"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.DisplayName:Abp.Identity.Password.PasswordChangePeriodDays",
+      "value": "Password change period(days)"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.DisplayName:Abp.Identity.Lockout.AllowedForNewUsers",
+      "value": "Enabled for new users"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.DisplayName:Abp.Identity.Lockout.LockoutDuration",
+      "value": "Lockout duration(seconds)"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.DisplayName:Abp.Identity.Lockout.MaxFailedAccessAttempts",
+      "value": "Max failed access attempts"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.DisplayName:Abp.Identity.SignIn.RequireConfirmedEmail",
+      "value": "Enforce email verification to sign in"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.DisplayName:Abp.Identity.SignIn.EnablePhoneNumberConfirmation",
+      "value": "Allow users to confirm their phone number"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.DisplayName:Abp.Identity.SignIn.RequireConfirmedPhoneNumber",
+      "value": "Enforce phone number verification to sign in"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.DisplayName:Abp.Identity.User.IsUserNameUpdateEnabled",
+      "value": "Allow users to change their usernames"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.DisplayName:Abp.Identity.User.IsEmailUpdateEnabled",
+      "value": "Allow users to change their email addresses"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Description:Abp.Identity.Password.RequiredLength",
+      "value": "The minimum length a password must be."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Description:Abp.Identity.Password.RequiredUniqueChars",
+      "value": "The minimum number of unique characters which a password must contain."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Description:Abp.Identity.Password.RequireNonAlphanumeric",
+      "value": "If passwords must contain a non-alphanumeric character."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Description:Abp.Identity.Password.RequireLowercase",
+      "value": "If passwords must contain a lower case ASCII character."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Description:Abp.Identity.Password.RequireUppercase",
+      "value": "If passwords must contain a upper case ASCII character."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Description:Abp.Identity.Password.RequireDigit",
+      "value": "If passwords must contain a digit."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Description:Abp.Identity.Password.ForceUsersToPeriodicallyChangePassword",
+      "value": "Whether users are forced to periodically change their password."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Description:Abp.Identity.Password.PasswordChangePeriodDays",
+      "value": "The number of days a user's password is valid for."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Description:Abp.Identity.Lockout.AllowedForNewUsers",
+      "value": "Whether a new user can be locked out."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Description:Abp.Identity.Lockout.LockoutDuration",
+      "value": "The duration a user is locked out for when a lockout occurs."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Description:Abp.Identity.Lockout.MaxFailedAccessAttempts",
+      "value": "The number of failed access attempts allowed before a user is locked out, assuming lock out is enabled."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Description:Abp.Identity.SignIn.RequireConfirmedEmail",
+      "value": "Users can create accounts but cannot sign in until they verify their email address."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Description:Abp.Identity.SignIn.EnablePhoneNumberConfirmation",
+      "value": "Users can verify their phone numbers. SMS integration required."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Description:Abp.Identity.SignIn.RequireConfirmedPhoneNumber",
+      "value": "Users can create accounts but cannot sign in until they verify their phone numbers."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Description:Abp.Identity.User.IsUserNameUpdateEnabled",
+      "value": "Whether the username can be updated by the user."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Description:Abp.Identity.User.IsEmailUpdateEnabled",
+      "value": "Whether the email can be updated by the user."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.DisplayName:Abp.Identity.SignIn.RequireEmailVerificationToRegister",
+      "value": "Enforce email verification to register"
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.Description:Abp.Identity.SignIn.RequireEmailVerificationToRegister",
+      "value": "User accounts will not be created unless they verify their email addresses."
+    },
+    {
+      "path": "$.localization.values.AbpIdentity.PasswordUpdateTime",
+      "value": "Password update time"
+    },
+    {
+      "path": "$.localization.values.AbpTenantManagement.ChangePassword",
+      "value": "Change password"
+    },
+    {
+      "path": "$.localization.values.AbpTenantManagement.DisplayName:AdminPassword",
+      "value": "Admin Password"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.ChangePassword",
+      "value": "Change password"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Menu:IdentityManagement",
+      "value": "Identity management"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Password",
+      "value": "Password"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.DisplayName:Password",
+      "value": "Password"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.DisplayName:CurrentPassword",
+      "value": "Current password"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.DisplayName:NewPassword",
+      "value": "New password"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.DisplayName:NewPasswordConfirm",
+      "value": "Confirm new password"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.PasswordChangedMessage",
+      "value": "Your password has been changed successfully."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:DefaultError",
+      "value": "An unknown failure has occurred."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:ConcurrencyFailure",
+      "value": "Optimistic concurrency check has been failed. The entity you're working on has modified by another user. Please discard your changes and try again."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:DuplicateEmail",
+      "value": "Email '{0}' is already taken."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:DuplicateRoleName",
+      "value": "Role name '{0}' is already taken."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:DuplicateUserName",
+      "value": "Username '{0}' is already taken."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:InvalidEmail",
+      "value": "Email '{0}' is invalid."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:InvalidPasswordHasherCompatibilityMode",
+      "value": "The provided PasswordHasherCompatibilityMode is invalid."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:InvalidPasswordHasherIterationCount",
+      "value": "The iteration count must be a positive integer."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:InvalidRoleName",
+      "value": "Role name '{0}' is invalid."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:InvalidToken",
+      "value": "Invalid token."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:InvalidUserName",
+      "value": "Username '{0}' is invalid."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:LoginAlreadyAssociated",
+      "value": "A user with this login already exists."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:PasswordMismatch",
+      "value": "Incorrect password."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:PasswordRequiresDigit",
+      "value": "Passwords must have at least one digit ('0'-'9')."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:PasswordRequiresLower",
+      "value": "Passwords must have at least one lowercase ('a'-'z')."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:PasswordRequiresNonAlphanumeric",
+      "value": "Passwords must have at least one non alphanumeric character."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:PasswordRequiresUpper",
+      "value": "Passwords must have at least one uppercase ('A'-'Z')."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:PasswordTooShort",
+      "value": "Passwords must be at least {0} characters."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:PasswordRequiresUniqueChars",
+      "value": "Passwords must use at least {0} different characters."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:RoleNotFound",
+      "value": "Role {0} does not exist."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:UserAlreadyHasPassword",
+      "value": "User already has a password set."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:UserAlreadyInRole",
+      "value": "User already in role '{0}'."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:UserLockedOut",
+      "value": "User is locked out."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:UserLockoutNotEnabled",
+      "value": "Lockout is not enabled for this user."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:UserNameNotFound",
+      "value": "User {0} does not exist."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:UserNotInRole",
+      "value": "User is not in role '{0}'."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:PasswordConfirmationFailed",
+      "value": "Password does not match the confirm password."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:NullSecurityStamp",
+      "value": "User security stamp cannot be null."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:RecoveryCodeRedemptionFailed",
+      "value": "Recovery code redemption failed."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:010001",
+      "value": "You can not delete your own account!"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:010002",
+      "value": "Can not set more than {MaxUserMembershipCount} organization unit for a user!"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:010003",
+      "value": "Can not change password of an externally logged in user!"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:010004",
+      "value": "There is already an organization unit with name {0}. Two units with same name can not be created in same level."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:010005",
+      "value": "Static roles can not be renamed."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:010006",
+      "value": "Static roles can not be deleted."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:010007",
+      "value": "You can't change your two factor setting."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:010008",
+      "value": "It's not allowed to change two factor setting."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:010009",
+      "value": "You can not delegate yourself."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:010021",
+      "value": "Name exist: '{0}'."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:010022",
+      "value": "Can not update a static ClaimType."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Volo.Abp.Identity:010023",
+      "value": "Can not delete a static ClaimType."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Identity.OrganizationUnit.MaxUserMembershipCount",
+      "value": "Maximum allowed organization unit membership count for a user"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Permission:IdentityManagement",
+      "value": "Identity management"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.DisplayName:Abp.Identity.Password.RequiredLength",
+      "value": "Required length"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.DisplayName:Abp.Identity.Password.RequiredUniqueChars",
+      "value": "Required unique characters number"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.DisplayName:Abp.Identity.Password.RequireNonAlphanumeric",
+      "value": "Required non-alphanumeric character"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.DisplayName:Abp.Identity.Password.RequireLowercase",
+      "value": "Required lower case character"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.DisplayName:Abp.Identity.Password.RequireUppercase",
+      "value": "Required upper case character"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.DisplayName:Abp.Identity.Password.RequireDigit",
+      "value": "Required digit"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.DisplayName:Abp.Identity.Password.ForceUsersToPeriodicallyChangePassword",
+      "value": "Force users to periodically change password"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.DisplayName:Abp.Identity.Password.PasswordChangePeriodDays",
+      "value": "Password change period(days)"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.DisplayName:Abp.Identity.Lockout.AllowedForNewUsers",
+      "value": "Enabled for new users"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.DisplayName:Abp.Identity.Lockout.LockoutDuration",
+      "value": "Lockout duration(seconds)"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.DisplayName:Abp.Identity.Lockout.MaxFailedAccessAttempts",
+      "value": "Max failed access attempts"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.DisplayName:Abp.Identity.SignIn.RequireConfirmedEmail",
+      "value": "Enforce email verification to sign in"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.DisplayName:Abp.Identity.SignIn.EnablePhoneNumberConfirmation",
+      "value": "Allow users to confirm their phone number"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.DisplayName:Abp.Identity.SignIn.RequireConfirmedPhoneNumber",
+      "value": "Enforce phone number verification to sign in"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.DisplayName:Abp.Identity.User.IsUserNameUpdateEnabled",
+      "value": "Allow users to change their usernames"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.DisplayName:Abp.Identity.User.IsEmailUpdateEnabled",
+      "value": "Allow users to change their email addresses"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Description:Abp.Identity.Password.RequiredLength",
+      "value": "The minimum length a password must be."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Description:Abp.Identity.Password.RequiredUniqueChars",
+      "value": "The minimum number of unique characters which a password must contain."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Description:Abp.Identity.Password.RequireNonAlphanumeric",
+      "value": "If passwords must contain a non-alphanumeric character."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Description:Abp.Identity.Password.RequireLowercase",
+      "value": "If passwords must contain a lower case ASCII character."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Description:Abp.Identity.Password.RequireUppercase",
+      "value": "If passwords must contain a upper case ASCII character."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Description:Abp.Identity.Password.RequireDigit",
+      "value": "If passwords must contain a digit."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Description:Abp.Identity.Password.ForceUsersToPeriodicallyChangePassword",
+      "value": "Whether users are forced to periodically change their password."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Description:Abp.Identity.Password.PasswordChangePeriodDays",
+      "value": "The number of days a user's password is valid for."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Description:Abp.Identity.Lockout.AllowedForNewUsers",
+      "value": "Whether a new user can be locked out."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Description:Abp.Identity.Lockout.LockoutDuration",
+      "value": "The duration a user is locked out for when a lockout occurs."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Description:Abp.Identity.Lockout.MaxFailedAccessAttempts",
+      "value": "The number of failed access attempts allowed before a user is locked out, assuming lock out is enabled."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Description:Abp.Identity.SignIn.RequireConfirmedEmail",
+      "value": "Users can create accounts but cannot sign in until they verify their email address."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Description:Abp.Identity.SignIn.EnablePhoneNumberConfirmation",
+      "value": "Users can verify their phone numbers. SMS integration required."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Description:Abp.Identity.SignIn.RequireConfirmedPhoneNumber",
+      "value": "Users can create accounts but cannot sign in until they verify their phone numbers."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Description:Abp.Identity.User.IsUserNameUpdateEnabled",
+      "value": "Whether the username can be updated by the user."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Description:Abp.Identity.User.IsEmailUpdateEnabled",
+      "value": "Whether the email can be updated by the user."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.DisplayName:Abp.Identity.SignIn.RequireEmailVerificationToRegister",
+      "value": "Enforce email verification to register"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.Description:Abp.Identity.SignIn.RequireEmailVerificationToRegister",
+      "value": "User accounts will not be created unless they verify their email addresses."
+    },
+    {
+      "path": "$.localization.values.BusinessServer.PasswordUpdateTime",
+      "value": "Password update time"
+    },
+    {
+      "path": "$.localization.values.BusinessServer.DisplayName:AdminPassword",
+      "value": "Admin Password"
+    },
+    {
+      "path": "$.localization.values.AbpEmailing.DisplayName:Abp.Mailing.Smtp.Password",
+      "value": "Password"
+    },
+    {
+      "path": "$.localization.values.AbpEmailing.Description:Abp.Mailing.Smtp.Password",
+      "value": "The password for the user name associated with the credentials."
+    },
+    {
+      "path": "$.localization.values.AbpAccount.ChangePassword",
+      "value": "Change password"
+    },
+    {
+      "path": "$.localization.values.AbpAccount.Password",
+      "value": "Password"
+    },
+    {
+      "path": "$.localization.values.AbpAccount.InvalidUserNameOrPassword",
+      "value": "Invalid username or password!"
+    },
+    {
+      "path": "$.localization.values.AbpAccount.DisplayName:CurrentPassword",
+      "value": "Current password"
+    },
+    {
+      "path": "$.localization.values.AbpAccount.DisplayName:NewPassword",
+      "value": "New password"
+    },
+    {
+      "path": "$.localization.values.AbpAccount.DisplayName:NewPasswordConfirm",
+      "value": "Confirm new password"
+    },
+    {
+      "path": "$.localization.values.AbpAccount.PasswordChangedMessage",
+      "value": "Your password has been changed successfully."
+    },
+    {
+      "path": "$.localization.values.AbpAccount.DisplayName:Password",
+      "value": "Password"
+    },
+    {
+      "path": "$.localization.values.AbpAccount.PasswordChanged",
+      "value": "Password changed"
+    },
+    {
+      "path": "$.localization.values.AbpAccount.NewPasswordConfirmFailed",
+      "value": "Please confirm the new password."
+    },
+    {
+      "path": "$.localization.values.AbpAccount.NewPasswordSameAsOld",
+      "value": "New password must be different from the old one."
+    },
+    {
+      "path": "$.localization.values.AbpAccount.ForgotPassword",
+      "value": "Forgot password?"
+    },
+    {
+      "path": "$.localization.values.AbpAccount.SendPasswordResetLink_Information",
+      "value": "A password reset link will be sent to your email to reset your password. If you don't get an email within a few minutes, please retry."
+    },
+    {
+      "path": "$.localization.values.AbpAccount.PasswordResetMailSentMessage",
+      "value": "Account recovery email sent to your e-mail address. If you don't see this email in your inbox within 15 minutes, look for it in your junk mail folder. If you find it there, please mark it as -Not Junk-. "
+    },
+    {
+      "path": "$.localization.values.AbpAccount.ResetPassword",
+      "value": "Reset Password"
+    },
+    {
+      "path": "$.localization.values.AbpAccount.ConfirmPassword",
+      "value": "Confirm the password"
+    },
+    {
+      "path": "$.localization.values.AbpAccount.ResetPassword_Information",
+      "value": "Please enter your new password."
+    },
+    {
+      "path": "$.localization.values.AbpAccount.YourPasswordIsSuccessfullyReset",
+      "value": "Your password is successfully reset."
+    },
+    {
+      "path": "$.localization.values.AbpAccount.ProfileTab:Password",
+      "value": "Change password"
+    },
+    {
+      "path": "$.localization.values.AbpAccount.PasswordReset",
+      "value": "Password reset"
+    },
+    {
+      "path": "$.localization.values.AbpAccount.PasswordResetInfoInEmail",
+      "value": "We received an account recovery request! If you initiated this request, click the following link to reset your password."
+    },
+    {
+      "path": "$.localization.values.AbpAccount.ResetMyPassword",
+      "value": "Reset my password"
+    },
+    {
+      "path": "$.setting.values.Abp.Identity.Password.RequiredLength",
+      "value": "6"
+    },
+    {
+      "path": "$.setting.values.Abp.Identity.Password.RequiredUniqueChars",
+      "value": "1"
+    },
+    {
+      "path": "$.setting.values.Abp.Identity.Password.RequireNonAlphanumeric",
+      "value": "True"
+    },
+    {
+      "path": "$.setting.values.Abp.Identity.Password.RequireLowercase",
+      "value": "True"
+    },
+    {
+      "path": "$.setting.values.Abp.Identity.Password.RequireUppercase",
+      "value": "True"
+    },
+    {
+      "path": "$.setting.values.Abp.Identity.Password.RequireDigit",
+      "value": "True"
+    },
+    {
+      "path": "$.setting.values.Abp.Identity.Password.ForceUsersToPeriodicallyChangePassword",
+      "value": "False"
+    },
+    {
+      "path": "$.setting.values.Abp.Identity.Password.PasswordChangePeriodDays",
+      "value": "0"
+    },
+    {
+      "path": "$.setting.values.Abp.Identity.Lockout.AllowedForNewUsers",
+      "value": "True"
+    },
+    {
+      "path": "$.setting.values.Abp.Identity.Lockout.LockoutDuration",
+      "value": "300"
+    },
+    {
+      "path": "$.setting.values.Abp.Identity.Lockout.MaxFailedAccessAttempts",
+      "value": "5"
+    },
+    {
+      "path": "$.setting.values.Abp.Identity.SignIn.RequireConfirmedEmail",
+      "value": "False"
+    },
+    {
+      "path": "$.setting.values.Abp.Identity.SignIn.EnablePhoneNumberConfirmation",
+      "value": "True"
+    },
+    {
+      "path": "$.setting.values.Abp.Identity.SignIn.RequireConfirmedPhoneNumber",
+      "value": "False"
+    },
+    {
+      "path": "$.setting.values.Abp.Identity.User.IsUserNameUpdateEnabled",
+      "value": "True"
+    },
+    {
+      "path": "$.setting.values.Abp.Identity.User.IsEmailUpdateEnabled",
+      "value": "True"
+    },
+    {
+      "path": "$.setting.values.Abp.Identity.OrganizationUnit.MaxUserMembershipCount",
+      "value": "2147483647"
+    }
+  ],
+  "hits_count": 223
+}

@@ -9,6 +9,7 @@
 from typing import Dict, Optional
 from pathlib import Path
 import json
+import os
 
 from generators.page_types import PageInfo
 from generators.page_object_generator import PageObjectGenerator
@@ -40,7 +41,11 @@ class TestCodeGenerator:
         output = Path(output_dir)
         files = {}
         file_name = get_file_name_from_url(page_info.url)
-        rules_ctx_path = (Path.cwd() / "reports" / "rules_context.md")
+        # 可审计：生成文件头引用“本阶段使用的 rules_context”
+        # - 默认：reports/rules_context.md
+        # - plan_flow 会按阶段写入 rules_context.<stage>.md，并通过环境变量覆盖
+        env_rules_ctx = (os.getenv("PT_RULES_CONTEXT_PATH") or "").strip()
+        rules_ctx_path = Path(env_rules_ctx).expanduser() if env_rules_ctx else (Path.cwd() / "reports" / "rules_context.md")
         
         # Page Object
         page_code = self.page_object_gen.generate_page_object(page_info)

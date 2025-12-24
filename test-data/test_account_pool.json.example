@@ -1,39 +1,18 @@
 {
   "test_account_pool": [
     {
-      "username": "testuser01",
-      "email": "testuser01@example.com",
-      "password": "TestPass123!",
-      "initial_password": "TestPass123!",
+      "username": "example_user_001",
+      "email": "example_user_001@example.com",
+      "password": "__REDACTED__",
+      "initial_password": "__REDACTED__",
       "in_use": false,
-      "last_used": null,
-      "is_locked": false
-    },
-    {
-      "username": "testuser02",
-      "email": "testuser02@example.com",
-      "password": "TestPass123!",
-      "initial_password": "TestPass123!",
-      "in_use": false,
-      "last_used": null,
-      "is_locked": false
-    },
-    {
-      "username": "testuser03",
-      "email": "testuser03@example.com",
-      "password": "TestPass123!",
-      "initial_password": "TestPass123!",
-      "in_use": false,
-      "last_used": null,
-      "is_locked": false
+      "is_locked": false,
+      "roles": ["default"]
     }
   ],
   "pool_config": {
-    "pool_size": 20,
-    "auto_register_fallback": true,
-    "cleanup_after_test": true,
-    "account_prefix": "testuser",
-    "account_lock_wait_time": 300,
-    "max_retry_on_lock": 3
+    "note": "示例账号池：请复制为 test_account_pool.json 并填入真实可用账号。严禁把真实密码提交到 GitHub。"
   }
 }
+
+

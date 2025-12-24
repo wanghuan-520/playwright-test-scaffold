@@ -1,0 +1,15 @@
+URL: https://localhost:3000/admin/profile/change-password
+Title: Aevatar Station
+
+Visible UI (accessibility snapshot summary):
+- Brand: Aevatar AI
+- Nav: Home, Workflow
+- Tabs: Personal Settings, Change Password (selected)
+- Heading: Change Password
+- Form fields:
+  - Current password (textbox) + Show password (button)
+  - New password (textbox) + Show password (button)
+  - Confirm new password (textbox) + Show password (button)
+- Primary action: Save (button)
+
+

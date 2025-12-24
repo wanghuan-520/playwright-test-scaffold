@@ -43,6 +43,9 @@ class RulesConfig:
     # generation.suite_files
     suite_files: Tuple[str, ...] = ("p0", "p1", "p2", "security")
 
+    # plan.output_path
+    plan_output_path: str = ""
+
     # page_object.loaded_indicator
     page_loaded_indicator_settings: str = "save_button"
     page_loaded_indicator_default: str = "first_input"
@@ -201,6 +204,17 @@ def _coerce_rules_config(raw: Dict[str, Any]) -> RulesConfig:
     else:
         suite_files_t = RulesConfig().suite_files
 
+    # ═══════════════════════════════════════════════════════════════
+    # Runtime override (plan-driven)
+    # - PT_SUITE_FILES="p0,p2,security"
+    # ═══════════════════════════════════════════════════════════════
+    env_suite = (os.getenv("PT_SUITE_FILES") or "").strip()
+    if env_suite:
+        parts = [p.strip().lower() for p in env_suite.split(",") if p.strip()]
+        parts = [p for p in parts if p in {"p0", "p1", "p2", "security"}]
+        if parts:
+            suite_files_t = tuple(parts)
+
     return RulesConfig(
         runtime_rules_context_enabled=bool(_dig(raw, "flow.runtime_rules_context.enabled", True)),
         runtime_rules_context_output_path=str(_dig(raw, "flow.runtime_rules_context.output_path", "reports/rules_context.md")),
@@ -209,6 +223,7 @@ def _coerce_rules_config(raw: Dict[str, Any]) -> RulesConfig:
         default_storage_state_fallback_glob=str(_dig(raw, "analysis.default_storage_state.fallback_glob", ".auth/storage_state.*.json")),
         pytest_default_target_from_url_enabled=bool(_dig(raw, "pytest.default_target_from_url.enabled", True)),
         suite_files=suite_files_t or RulesConfig().suite_files,
+        plan_output_path=str(_dig(raw, "plan.output_path", "")),
         page_loaded_indicator_settings=str(_dig(raw, "page_object.loaded_indicator.settings", "save_button")),
         page_loaded_indicator_default=str(_dig(raw, "page_object.loaded_indicator.default", "first_input")),
     )
