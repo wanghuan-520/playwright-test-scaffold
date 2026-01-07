@@ -1,0 +1,92 @@
+{
+  "test_account_pool": [
+    {
+      "username": "login_pass31_user",
+      "email": "login_pass31@example.com",
+      "password": "P1111111111111111111111111111a!",
+      "initial_password": "P1111111111111111111111111111a!",
+      "in_use": false,
+      "is_locked": false,
+      "roles": ["default"],
+      "tags": ["login_boundary", "password_31"],
+      "purpose": "test_p1_login_password_length_boundaries[chromium-31]",
+      "note": "Password 长度=31（边界值测试）"
+    },
+    {
+      "username": "login_pass32_user",
+      "email": "login_pass32@example.com",
+      "password": "P11111111111111111111111111111a!",
+      "initial_password": "P11111111111111111111111111111a!",
+      "in_use": false,
+      "is_locked": false,
+      "roles": ["default"],
+      "tags": ["login_boundary", "password_32"],
+      "purpose": "test_p1_login_password_length_boundaries[chromium-32]",
+      "note": "Password 长度=32（ABP 最大值）"
+    },
+    {
+      "username": "login_pass33_user",
+      "email": "login_pass33@example.com",
+      "password": "P111111111111111111111111111111a!",
+      "initial_password": "P111111111111111111111111111111a!",
+      "in_use": false,
+      "is_locked": false,
+      "roles": ["default"],
+      "tags": ["login_boundary", "password_33"],
+      "purpose": "test_p1_login_password_length_boundaries[chromium-33]",
+      "note": "⚠️ Password 长度=33（超过 ABP 约束），需直接操作数据库创建或跳过此账号"
+    },
+    {
+      "username": "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+      "email": "login_user255@example.com",
+      "password": "ValidPass123!",
+      "initial_password": "ValidPass123!",
+      "in_use": false,
+      "is_locked": false,
+      "roles": ["default"],
+      "tags": ["login_boundary", "username_255"],
+      "purpose": "test_p1_login_username_length_boundaries[chromium-255]",
+      "note": "Username 长度=255（边界值测试）"
+    },
+    {
+      "username": "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+      "email": "login_user256@example.com",
+      "password": "ValidPass123!",
+      "initial_password": "ValidPass123!",
+      "in_use": false,
+      "is_locked": false,
+      "roles": ["default"],
+      "tags": ["login_boundary", "username_256"],
+      "purpose": "test_p1_login_username_length_boundaries[chromium-256]",
+      "note": "Username 长度=256（ABP 最大值）"
+    },
+    {
+      "username": "login_required_test_user1",
+      "email": "login_required1@example.com",
+      "password": "ValidPass123!",
+      "initial_password": "ValidPass123!",
+      "in_use": false,
+      "is_locked": false,
+      "roles": ["default"],
+      "tags": ["login_required"],
+      "purpose": "test_p1_login_required_fields_validation[chromium-username_or_email-#LoginInput_UserNameOrEmailAddress]",
+      "note": "必填字段验证测试（避免锁定）"
+    },
+    {
+      "username": "login_required_test_user2",
+      "email": "login_required2@example.com",
+      "password": "ValidPass123!",
+      "initial_password": "ValidPass123!",
+      "in_use": false,
+      "is_locked": false,
+      "roles": ["default"],
+      "tags": ["login_required"],
+      "purpose": "test_p1_login_required_fields_validation[chromium-password-#LoginInput_Password]",
+      "note": "必填字段验证测试（避免锁定）"
+    }
+  ],
+  "pool_config": {
+    "note": "Login 边界值测试专用账号池。请先通过注册页面或 API 创建这些账号（password=33 的账号除外）。"
+  }
+}
+

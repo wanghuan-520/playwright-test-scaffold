@@ -112,31 +112,6 @@ class PageActions:
         logger.debug(f"取消勾选: {selector}")
         self.page.uncheck(selector)
     
-    # ═══════════════════════════════════════════════════════════════
-    # ELEMENT STATE METHODS
-    # ═══════════════════════════════════════════════════════════════
-    
-    def is_visible(self, selector: str, timeout: int = 5000) -> bool:
-        """
-        检查元素是否可见
-        
-        Args:
-            selector: 元素选择器
-            timeout: 超时时间(毫秒)
-            
-        Returns:
-            bool: 元素是否可见
-        """
-        try:
-            return self.page.is_visible(selector, timeout=timeout)
-        except Exception:
-            return False
-    
-    def is_enabled(self, selector: str) -> bool:
-        """检查元素是否启用"""
-        return self.page.is_enabled(selector)
-    
-    def is_checked(self, selector: str) -> bool:
-        """检查复选框是否被勾选"""
-        return self.page.is_checked(selector)
-    
+    # NOTE:
+    # - BasePage 已提供 is_visible/is_enabled/is_checked 等查询接口
+    # - 这里仅保留“动作”方法，避免 mixin 间 API 重叠造成困惑

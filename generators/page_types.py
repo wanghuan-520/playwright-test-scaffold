@@ -35,6 +35,10 @@ class PageInfo:
     url: str
     title: str
     page_type: str  # LOGIN, FORM, LIST, DETAIL, DASHBOARD, SETTINGS
+    # 是否需要登录态（可选字段：用于生成测试计划时更准确地表达前置条件）
+    # - None: 未判定（旧数据兼容）
+    # - True/False: 调用方（动态分析/爬站）给出的结论
+    auth_required: Optional[bool] = None
     elements: List[PageElement] = field(default_factory=list)
     forms: List[Dict] = field(default_factory=list)
     navigation: List[Dict] = field(default_factory=list)
@@ -75,6 +79,7 @@ def page_info_from_dict(d: Dict[str, Any]) -> PageInfo:
         url=str(d.get("url") or ""),
         title=str(d.get("title") or ""),
         page_type=str(d.get("page_type") or "FORM"),
+        auth_required=(d.get("auth_required") if isinstance(d.get("auth_required"), bool) else None),
         elements=elements,
         forms=list(d.get("forms") or []),
         navigation=list(d.get("navigation") or []),

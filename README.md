@@ -640,6 +640,7 @@ refactor(utils): 简化 ServiceChecker 逻辑
 
 | 文档 | 说明 |
 |------|------|
+| [框架讲解](docs/framework_overview.md) | 从 pytest 入口到 fixtures/账号池/Allure 汇总的“跑通+扩展”说明 |
 | [架构设计](docs/architecture.md) | 完整的架构说明、设计模式、模块职责 |
 | [测试流程](docs/test-workflow.md) | 详细的测试流程图、数据流转 |
 | [规则系统](.cursor/README.md) | AI 规则系统的最简入口与关系图 |

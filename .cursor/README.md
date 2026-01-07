@@ -17,7 +17,7 @@
        ├─ core/project-overview.mdc        # 项目约束/仓库口径
        ├─ generation/code-generation.mdc   # POM/目录/命名/生成骨架
        ├─ quality/test-case-standards.mdc  # 矩阵用例/断言层级/回滚要求
-       ├─ quality/allure-reporting.mdc     # Allure 降噪/失败证据
+       ├─ quality/allure-reporting.mdc     # Allure 降噪/失败证据（含“参数化标题降噪 / ProfileSettings 风格”）
        └─ data/data-management.mdc         # 数据文件/账号池/可重复执行
 
 规则库（按需查）

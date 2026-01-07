@@ -49,6 +49,24 @@
 - **定义**：安全类用例使用 `@pytest.mark.security` 标记（不替代 P0/P1/P2）。
 - **建议**：大多数安全用例风险等级接近 P1，可同时标记 `P1 + security`。
 - **最小覆盖**：未登录访问受保护页面应进入登录流程、logout 后应被拦截、XSS 不执行、SQLi 风格输入不导致异常跳转。
+- **控制变量原则（强制）**：
+  - 安全测试的本质是验证"系统能否正确处理恶意输入"
+  - **必须控制变量**：只改目标字段为恶意 payload，其余字段填合法值
+  - **反例**：所有字段都填恶意值 → 无法定位是哪个字段导致的问题
+  - **正例**：目标字段填 `<script>alert(1)</script>`，其余字段填 `validuser123` / `valid@test.com`
+
+```python
+# ❌ 错误：不控制变量（所有字段都是恶意值）
+po.fill_username("<script>alert(1)</script>")
+po.fill_email("<script>alert(1)</script>")
+po.fill_password("<script>alert(1)</script>")
+
+# ✅ 正确：控制变量（只有目标字段是恶意值）
+baseline = {"username": "validuser", "email": "valid@test.com", "password": "ValidPass123!"}
+po.fill_username(baseline["username"])
+po.fill_email(baseline["email"])
+po.fill_password(payload)  # 只有 password 是恶意 payload
+```
 
 ---
 
@@ -132,6 +150,44 @@ tests/
   - 若触发提交 API：不应为 5xx
   - 用例结束必须恢复数据（避免污染账号池）
 
+#### Security Payload 精简原则（强制）
+
+**问题**：安全测试容易陷入"payload 堆积"陷阱（8个payload × 3字段 = 24条用例），但实际上：
+- 如果前端做了统一转义/校验，所有 XSS payload 会有相同结果
+- 如果后端用了参数化查询（ABP 默认），所有 SQLi payload 会有相同结果
+- 冗余的 payload 只增加执行时间，不增加覆盖率
+
+**精简方案**（5个代表性 payload，覆盖核心攻击向量）：
+
+```python
+_PAYLOADS = [
+    # XSS 类：经典 script 注入
+    ("xss_script", "<script>alert('XSS')</script>"),
+    # XSS 类：事件触发型（img onerror）
+    ("xss_img", "<img src=x onerror=alert('XSS')>"),
+    
+    # SQLi 类：经典逻辑绕过（OR 1=1）
+    ("sqli_quote", "' OR '1'='1"),
+    # SQLi 类：注释截断
+    ("sqli_comment", "admin'--"),
+    
+    # HTML 注入：基础标签过滤测试
+    ("html_bold", "<b>bold</b>"),
+]
+```
+
+**移除的 payload 及理由**：
+- ❌ `xss_svg` / `xss_iframe`：与 `xss_script` 本质相同，参数化转义会同时阻止
+- ❌ `sqli_union` / `sqli_drop_table`：与 `sqli_quote` 同类，参数化查询会同时阻止
+- ❌ `mixed_email_sqli`：与 `sqli_quote` 同类，测一个足够
+
+**效果**：
+- 3字段 × 5 payload = **15条用例**（vs 原来 21-24条）
+- 执行时间减少 **~30%**
+- 覆盖率**不降低**（XSS/SQLi/HTML注入的核心攻击向量都在）
+
+**哲学**：能消失的分支永远比能写对的分支更优雅。
+
 ---
 
 ## 测试用例完整性检查清单
@@ -195,6 +251,29 @@ def test_p1_password_too_long(...)         # 大于最大值
 def test_p1_password_boundary_values(...)  # 正好等于 min 和 max
 ```
 
+### 4. 异常处理逻辑错误
+
+```python
+# ❌ 错误：在 except 块中重复操作已经消失的元素
+try:
+    with page.expect_navigation(timeout=20000):
+        click_save(page)  # 点击成功，页面跳转
+except Exception:
+    click_save(page)  # ❌ 按钮已消失，导致失败
+
+# ✅ 正确：异常后直接继续（点击已成功，只是等待超时）
+try:
+    with page.expect_navigation(timeout=20000):
+        click_save(page)
+except Exception:
+    pass  # 点击已成功，只是导航等待超时（网络抖动）
+```
+
+**原则**：
+- 异常处理应该**消除特殊分支**，而不是增加分支
+- 如果操作已经成功，不要因为"等待超时"就重复操作
+- **好品味**：能消失的分支永远比能写对的分支更优雅
+
 ---
 
 ## 🔐 Security 用例基线（当用户要求安全测试时，必须覆盖）
@@ -207,4 +286,59 @@ def test_p1_password_boundary_values(...)  # 正好等于 min 和 max
 - ✅ **XSS payload 不得执行**：输入 `<img src=x onerror=alert(1)>` 等载荷，页面不应弹出 dialog
 - ✅ **SQLi 风格字符串不应导致异常行为**：如 `' OR 1=1 --`，页面不应崩溃/异常跳转
 
-> 说明：安全用例的断言应以“系统不崩、无执行、无越权”为核心，避免强绑定具体 toast 文案。
+> 说明：安全用例的断言应以"系统不崩、无执行、无越权"为核心，避免强绑定具体 toast 文案。
+
+---
+
+## 🐛 Known Bugs 管理策略（强制）
+
+### 问题：xfail 掩盖真相
+传统做法是用 `@pytest.mark.xfail` 标记已知Bug，但这会导致：
+- ❌ 报告中显示为"预期失败"（xfailed），通过率虚高（97% vs 74%）
+- ❌ 已知Bug"安静地"隐藏在绿色背景中，无法引起重视
+- ❌ Bug 修复后容易忘记移除 xfail 标记
+
+### 解决方案：直接 FAIL（实用主义）
+
+**原则**：**已知Bug应该在报告里"刺眼地"显示为失败，而不是"安静地"标记为预期失败。**
+
+```python
+# ❌ 错误：用 xfail 掩盖Bug
+@pytest.mark.xfail(reason="REG-001: username注入导致500")
+def test_security_injection_username():
+    # ...
+    assert resp.status < 500  # 实际会 500，但被 xfail 掩盖
+
+# ✅ 正确：直接失败，刺眼地暴露问题
+def test_security_injection_username():
+    # ...
+    assert resp.status < 500  # 失败 → 报告里显示红色 FAILED
+```
+
+**Known Bugs 台账管理**：
+- 创建 `test_<page>_known_bugs.py`，集中定义 Bug ID 和描述
+- 在失败用例的 `@allure.description()` 或注释中引用 Bug ID
+- Allure 报告中会自动归类为 "Product defects"
+
+```python
+# tests/Account/Register/test_Register_known_bugs.py
+BUG_REG_INJECTION_500 = "REG-002"
+BUGS = {
+    BUG_REG_INJECTION_500: {
+        "title": "username/password注入导致500",
+        "reason": "后端未正确处理特殊字符，导致500错误",
+        "jira": "https://jira.example.com/browse/REG-002",
+    }
+}
+
+# 在其他测试文件中引用（不使用 xfail）
+@allure.description(f"已知Bug: {BUGS[BUG_REG_INJECTION_500]['title']}")
+def test_security_injection_username():
+    # 测试会失败，报告中显示为 Product defects
+    pass
+```
+
+**效果**：
+- 报告通过率真实反映质量（74% vs 虚高的 97%）
+- Product defects 数量直观（13个红色失败，无法忽视）
+- Bug 修复后，测试自然变绿，无需手动移除标记

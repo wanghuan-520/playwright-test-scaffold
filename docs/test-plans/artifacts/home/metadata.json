@@ -1,0 +1,39 @@
+{
+  "slug": "home",
+  "url": "https://localhost:3000/",
+  "final_url": "https://localhost:3000/",
+  "title": "Aevatar Station",
+  "auth_required": false,
+  "evidence_files": [
+    "visible.html",
+    "visible.txt",
+    "page.png",
+    "metadata.json",
+    "abp_app_config.json",
+    "backend_swagger.json",
+    "abp_rules_extract.json"
+  ],
+  "locator_hints": {
+    "tabs": {},
+    "inputs": {},
+    "buttons": {
+      "sign_in": "role=button[name=\"Sign In\"]",
+      "get_started": "role=button[name=\"Get Started\"]",
+      "create_workflow": "role=button[name=\"Create Workflow\"]",
+      "view_on_github": "role=button[name=\"View on GitHub\"]",
+      "dashboard": "role=button[name=\"Dashboard\"]",
+      "open_next_js_dev_tools": "role=button[name=\"Open Next.js Dev Tools\"]"
+    },
+    "links": {
+      "aevatar_ai": "role=link[name=\"Aevatar AI\"]",
+      "workflow": "role=link[name=\"Workflow\"]",
+      "github": "role=link[name=\"GitHub\"]",
+      "get_started": "role=link[name=\"Get Started\"]",
+      "create_workflow": "role=link[name=\"Create Workflow\"]",
+      "view_on_github": "role=link[name=\"View on GitHub\"]",
+      "dashboard": "role=link[name=\"Dashboard\"]",
+      "terms_of_service": "role=link[name=\"Terms of Service\"]",
+      "privacy": "role=link[name=\"Privacy\"]"
+    }
+  }
+}

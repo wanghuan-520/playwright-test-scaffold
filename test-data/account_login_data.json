@@ -1,0 +1,26 @@
+{
+  "page_info": {
+    "url": "https://localhost:44320/Account/Login",
+    "type": "LOGIN"
+  },
+  "valid_data": {
+    "username_or_email_address": "test_value",
+    "password": "ValidPass123!"
+  },
+  "invalid_data": {
+    "username_or_email_address": "",
+    "password": "123"
+  },
+  "boundary_data": {
+    "username_or_email_address": {
+      "empty": "",
+      "min": "a",
+      "max": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "special": "@#$%^&*()"
+    },
+    "password": {
+      "min": "a",
+      "max": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    }
+  }
+}

@@ -2,23 +2,18 @@
 # Playwright Test Scaffold - Page Waits
 # ═══════════════════════════════════════════════════════════════
 """
-BasePage - 所有页面对象的抽象基类
-提供统一的页面操作接口，子类只需关注业务逻辑
+页面等待策略（Waits）。
+
+说明：
+- 该类作为 mixin 被 `BasePage` 组合使用，只提供等待相关方法。
 """
 
-from playwright.sync_api import Page, Locator, expect
-from abc import ABC, abstractmethod
-from typing import Optional, List, Dict, Any
-from core.page_utils import PageUtils
 from utils.logger import get_logger
-from utils.config import ConfigManager
 
 logger = get_logger(__name__)
 
 
-
 class PageWaits:
-    pass
     """页面等待策略"""
 
     def wait_for_element(self, selector: str, state: str = "visible", timeout: int = 10000) -> None:

@@ -1,0 +1,20 @@
+{
+  "page_info": {
+    "url": "https://localhost:3000/admin/users/roles",
+    "type": "FORM"
+  },
+  "valid_data": {
+    "search": "test_value"
+  },
+  "invalid_data": {
+    "search": ""
+  },
+  "boundary_data": {
+    "search": {
+      "empty": "",
+      "min": "a",
+      "max": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "special": "@#$%^&*()"
+    }
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "base_url": "https://localhost:3000",
+  "pages": [
+    {
+      "url": "https://localhost:3000/",
+      "slug": "home",
+      "auth_required": false
+    },
+    {
+      "url": "https://localhost:3000/admin",
+      "slug": "admin",
+      "auth_required": true
+    },
+    {
+      "url": "https://localhost:3000/admin/profile",
+      "slug": "admin_profile",
+      "auth_required": true
+    },
+    {
+      "url": "https://localhost:3000/admin/profile/change-password",
+      "slug": "admin_profile_change_password",
+      "auth_required": true
+    },
+    {
+      "url": "https://localhost:3000/admin/settings",
+      "slug": "admin_settings",
+      "auth_required": true
+    },
+    {
+      "url": "https://localhost:3000/admin/settings/feature-management",
+      "slug": "admin_settings_feature_management",
+      "auth_required": true
+    },
+    {
+      "url": "https://localhost:3000/admin/users",
+      "slug": "admin_users",
+      "auth_required": true
+    },
+    {
+      "url": "https://localhost:3000/admin/users/roles",
+      "slug": "admin_users_roles",
+      "auth_required": true
+    },
+    {
+      "url": "https://localhost:3000/workflow",
+      "slug": "workflow",
+      "auth_required": false
+    },
+    {
+      "url": "https://localhost:44320/Account/ForgotPassword",
+      "slug": "account_forgotpassword",
+      "auth_required": false
+    },
+    {
+      "url": "https://localhost:44320/Account/Login",
+      "slug": "account_login",
+      "auth_required": false
+    },
+    {
+      "url": "https://localhost:44320/Account/Register",
+      "slug": "account_register",
+      "auth_required": false
+    }
+  ]
+}

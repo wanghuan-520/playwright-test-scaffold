@@ -1,0 +1,22 @@
+url: https://localhost:3000/admin/settings
+final_url: https://localhost:3000/admin/settings
+title: Aevatar Station
+login_required_suspect: false
+
+controls:
+  - link: Aevatar AI
+  - link: Home
+  - link: Workflow
+  - button: Toggle user menu
+  - tab: Emailing
+  - tab: Feature management
+  - heading: Emailing
+  - textbox: Default from display name
+  - textbox: Default from address
+  - textbox: Host
+  - checkbox: Enable ssl
+  - checkbox: Use default credentials
+  - textbox: Domain
+  - textbox: User name
+  - textbox: Password
+  - button: Open Next.js Dev Tools

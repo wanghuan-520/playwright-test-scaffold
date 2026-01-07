@@ -1,0 +1,19 @@
+url: https://localhost:3000/workflow
+final_url: https://localhost:3000/workflow
+title: Aevatar Station
+login_required_suspect: false
+
+controls:
+  - link: Aevatar AI
+  - link: Workflow
+  - link: GitHub
+  - button: Sign In
+  - link: Get Started
+  - button: Get Started
+  - button: Choose File
+  - button: Import Workflow
+  - button: New Workflow
+  - button:
+  - button: Open Next.js Dev Tools
+  - button: Open issues overlay
+  - button: Collapse issues badge

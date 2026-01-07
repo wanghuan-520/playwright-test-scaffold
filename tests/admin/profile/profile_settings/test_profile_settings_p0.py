@@ -146,10 +146,6 @@ def test_p0_profile_settings_page_load(profile_settings_p0):
 @pytest.mark.functional
 @allure.feature("Profile Settings")
 @allure.story("P0 - 主流程")
-@pytest.mark.P0
-@pytest.mark.functional
-@allure.feature("Profile Settings")
-@allure.story("P0 - 主流程")
 @allure.description(
     """
 测试点：

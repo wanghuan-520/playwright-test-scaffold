@@ -135,6 +135,28 @@ def setup_test_environment():
                     returncode=2,
                 )
 
+            # 进一步做“HTTP 级别”健康检查（默认开启，可用 PRECHECK_HTTP=0 关闭）
+            # 背景：TCP 可连 != 服务可用；常见症状是端口开着但页面/接口卡死，导致大量 Page.goto 60s 超时。
+            precheck_http = os.getenv("PRECHECK_HTTP", "").strip()
+            if precheck_http.lower() not in {"0", "false", "no"}:
+                try:
+                    from utils.service_checker import ServiceChecker
+
+                    checker = ServiceChecker()
+                    if checker.is_enabled():
+                        results = checker.check_all_services()
+                        failed = [(name, reason) for name, (ok, reason) in results.items() if not ok]
+                        if failed:
+                            lines = ["服务健康检查失败（fail-fast）："]
+                            for name, reason in failed:
+                                lines.append(f"- {name}: FAIL ({reason}) url={checker.config.get_health_check_url(name)}")
+                            lines.append("提示：这通常会导致 Page.goto 长时间超时。请先恢复服务，再运行用例。")
+                            lines.append("如确需跳过该检查：设置 PRECHECK_HTTP=0。")
+                            pytest.exit("\n".join(lines), returncode=2)
+                except Exception as e:
+                    # 诊断失败不应影响主流程（保守策略：只在检测出明确 FAIL 时退出）
+                    logger.warning(f"HTTP 健康检查异常（已忽略，不阻塞运行）: {type(e).__name__}: {e}")
+
     # ────────────────────────────────────────────────────────────
     # 账号池预检（可选，使用后端接口，速度更快）
     # ────────────────────────────────────────────────────────────

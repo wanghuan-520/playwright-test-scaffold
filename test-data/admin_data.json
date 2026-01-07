@@ -1,0 +1,9 @@
+{
+  "page_info": {
+    "url": "https://localhost:3000/admin",
+    "type": "FORM"
+  },
+  "valid_data": {},
+  "invalid_data": {},
+  "boundary_data": {}
+}

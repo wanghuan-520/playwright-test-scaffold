@@ -1,0 +1,9 @@
+{
+  "page_info": {
+    "url": "https://localhost:3000/admin/settings/feature-management",
+    "type": "SETTINGS"
+  },
+  "valid_data": {},
+  "invalid_data": {},
+  "boundary_data": {}
+}

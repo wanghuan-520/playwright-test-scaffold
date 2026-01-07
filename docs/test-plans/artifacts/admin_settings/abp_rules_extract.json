@@ -1,0 +1,21 @@
+{
+  "source": {
+    "abp_app_config": "abp_app_config.json",
+    "backend_swagger": "backend_swagger.json",
+    "abp_swagger": "abp_swagger.json"
+  },
+  "password_policy": {},
+  "notes": [
+    "abp_swagger_unavailable"
+  ],
+  "api_contract": {
+    "method": "TBD",
+    "path": "TBD",
+    "tag": "TBD",
+    "request_schema": "TBD",
+    "request_constraints": {},
+    "responses": {},
+    "error_schema": "TBD",
+    "error_shape": {}
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "slug": "account_login",
+  "url": "https://localhost:44320/Account/Login",
+  "final_url": "https://localhost:44320/Account/Login",
+  "title": "MyApplication",
+  "auth_required": false,
+  "evidence_files": [
+    "visible.html",
+    "visible.txt",
+    "page.png",
+    "metadata.json",
+    "abp_app_config.json",
+    "backend_swagger.json",
+    "abp_rules_extract.json"
+  ],
+  "locator_hints": {
+    "tabs": {},
+    "inputs": {
+      "username_or_email_address": "role=textbox[name=\"Username or email address\"]",
+      "password": "role=textbox[name=\"Password\"]"
+    },
+    "buttons": {
+      "english": "role=button[name=\" English\"]",
+      "login": "role=button[name=\"Login\"]"
+    },
+    "links": {
+      "register": "role=link[name=\"Register\"]",
+      "forgot_password": "role=link[name=\"Forgot password?\"]"
+    }
+  }
+}

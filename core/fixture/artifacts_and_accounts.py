@@ -170,10 +170,24 @@ def artifacts_on_failure(request):
 # TEST DATA MANAGEMENT
 # ═══════════════════════════════════════════════════════════════
 
-@pytest.fixture(scope="function", autouse=True)
+@pytest.fixture(scope="function", autouse=False)
 def test_account(request):
     """
-    测试账号 fixture - 每个测试用例使用独立的测试账号
+    测试账号 fixture - 仅在"显式依赖该 fixture 的用例"中分配账号。
+    
+    账号类型智能选择：
+    - change_password 测试 → "change_password" 类型（专用，避免并发冲突）
+    - 其他测试 → "ui_login" 类型（一般 UI 登录）
+    
+    三层账号池架构：
+    - auth (15): auth_page + storage_state（一般认证测试）
+    - ui_login (15): logged_in_page（一般 UI 登录测试）
+    - change_password (10): 密码修改测试专用（避免状态冲突）
+
+    背景：
+    - 之前该 fixture 是 autouse，会导致所有用例（哪怕走 auth_page/storage_state 的用例）
+      都去账号池分配+预检账号，造成账号池被无意义消耗，xdist 下尤其致命。
+    - 现在改为按需：只有当用例确实需要"账号信息/用户名密码登录链路"时才分配。
     """
     reuse_login = os.getenv("REUSE_LOGIN", "").strip() in {"1", "true", "True", "yes", "YES"}
     if reuse_login:
@@ -187,6 +201,14 @@ def test_account(request):
     logger.info(f"🧹 测试前数据清洗: {test_name}")
     data_manager.cleanup_before_test(test_name)
 
+    # ✅ 智能选择账号类型
+    # 如果是 change_password 相关测试，使用专用账号池（避免并发状态冲突）
+    if "change_password" in test_name.lower() or "change-password" in test_name.lower():
+        account_type = "change_password"
+        logger.info(f"🔐 检测到密码修改测试，使用专用账号池（类型: {account_type}）")
+    else:
+        account_type = "ui_login"
+
     # 账号可用性预检（避免 UI 登录阶段才发现 invalid/lockout 导致整条用例 setup error）
     backend_url = (config.get_service_url("backend") or "").rstrip("/")
     max_attempts = int(os.getenv("ACCOUNT_ALLOCATE_RETRY", "5"))
@@ -196,9 +218,10 @@ def test_account(request):
 
     account = None
     for i in range(max_attempts):
-        account = data_manager.get_test_account(test_name)
+        # ✅ 使用智能选择的账号类型
+        account = data_manager.get_test_account(test_name, account_type=account_type)
         tried.append(account.get("username"))
-        logger.info(f"📦 测试用例 {test_name} 分配账号: {account['username']}")
+        logger.info(f"📦 测试用例 {test_name} 分配账号: {account['username']} (类型: {account_type})")
 
         # 若缺少 backend_url，则无法预检，直接放行（保持向后兼容）
         if not backend_url:
@@ -215,11 +238,19 @@ def test_account(request):
         if ok and authenticated:
             break
 
-        # 预检失败：标记账号不可用，释放本用例占用，继续挑下一个
-        try:
-            data_manager.mark_account_locked(account.get("username"), reason=f"precheck_failed:{reason}")
-        except Exception:
-            pass
+        # 预检失败：只在“明确无效/明确被锁”时锁定账号，避免误伤把账号池耗尽
+        should_lock = False
+        if reason in {"invalid_credentials", "lockout"}:
+            should_lock = True
+        if isinstance(reason, str) and reason.startswith("login_Invalid") and "password" in reason.lower():
+            should_lock = True
+        if should_lock:
+            try:
+                data_manager.mark_account_locked(account.get("username"), reason=f"precheck_failed:{reason}")
+            except Exception:
+                pass
+        else:
+            logger.warning(f"账号预检失败但不锁定（可能是环境/暂态）：acc={account.get('username')} reason={reason}")
         try:
             data_manager.cleanup_before_test(test_name)
         except Exception:

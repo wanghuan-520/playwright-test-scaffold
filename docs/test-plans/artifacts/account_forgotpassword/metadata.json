@@ -1,0 +1,29 @@
+{
+  "slug": "account_forgotpassword",
+  "url": "https://localhost:44320/Account/ForgotPassword",
+  "final_url": "https://localhost:44320/Account/ForgotPassword",
+  "title": "MyApplication",
+  "auth_required": false,
+  "evidence_files": [
+    "visible.html",
+    "visible.txt",
+    "page.png",
+    "metadata.json",
+    "abp_app_config.json",
+    "backend_swagger.json",
+    "abp_rules_extract.json"
+  ],
+  "locator_hints": {
+    "tabs": {},
+    "inputs": {
+      "email": "role=textbox[name=\"Email *\"]"
+    },
+    "buttons": {
+      "english": "role=button[name=\" English\"]",
+      "submit": "role=button[name=\"Submit\"]"
+    },
+    "links": {
+      "login": "role=link[name=\"Login\"]"
+    }
+  }
+}

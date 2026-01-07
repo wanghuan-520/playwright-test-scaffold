@@ -1,0 +1,31 @@
+{
+  "slug": "admin_users_roles",
+  "url": "https://localhost:3000/admin/users/roles",
+  "final_url": "https://localhost:3000/admin/users/roles",
+  "title": "Aevatar Station",
+  "auth_required": true,
+  "evidence_files": [
+    "visible.html",
+    "visible.txt",
+    "page.png",
+    "metadata.json",
+    "abp_app_config.json",
+    "backend_swagger.json",
+    "abp_rules_extract.json"
+  ],
+  "locator_hints": {
+    "tabs": {},
+    "inputs": {
+      "search": "role=textbox[name=\"Search...\"]"
+    },
+    "buttons": {
+      "toggle_user_menu": "role=button[name=\"Toggle user menu\"]",
+      "open_next_js_dev_tools": "role=button[name=\"Open Next.js Dev Tools\"]"
+    },
+    "links": {
+      "aevatar_ai": "role=link[name=\"Aevatar AI\"]",
+      "home": "role=link[name=\"Home\"]",
+      "workflow": "role=link[name=\"Workflow\"]"
+    }
+  }
+}

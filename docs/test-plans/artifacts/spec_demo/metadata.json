@@ -1,0 +1,16 @@
+{
+  "slug": "spec_demo",
+  "url": "https://localhost:3000/",
+  "final_url": "https://localhost:3000/",
+  "title": "",
+  "auth_required": false,
+  "evidence_files": [
+    "metadata.json"
+  ],
+  "locator_hints": {
+    "tabs": {},
+    "inputs": {},
+    "buttons": {},
+    "links": {}
+  }
+}

@@ -175,12 +175,16 @@ class DataManager:
                     pass
             raise
     
-    def get_test_account(self, test_name: str) -> Dict[str, str]:
+    def get_test_account(self, test_name: str, account_type: str = "default") -> Dict[str, str]:
         """
         为测试用例分配独立的测试账号
         
         Args:
             test_name: 测试用例名称（如 "test_p0_change_password_success"）
+            account_type: 账号类型（"default" | "ui_login" | "auth"）
+                - "default": 通用账号（兼容现有测试）
+                - "ui_login": 专用于 logged_in_page fixture（UI 登录链路）
+                - "auth": 专用于 auth_page fixture（API 登录链路）
             
         Returns:
             测试账号信息（username, email, password）
@@ -189,15 +193,20 @@ class DataManager:
             data = self._load_account_pool()
             pool = data.get("test_account_pool", [])
             
-            # 查找未锁定且未使用的账号
+            # 查找未锁定且未使用的账号，并按账号类型过滤
+            # account_type 字段：支持账号池分层，避免不同 fixture 争抢同一账号
+            # - "default": 兼容现有账号（account_type 字段缺失的账号）
+            # - "ui_login": 专用于 logged_in_page（UI 登录链路）
+            # - "auth": 专用于 auth_page（API 登录链路，使用 storage_state）
             available_accounts = [
                 acc for acc in pool 
                 if not acc.get("is_locked", False) and not acc.get("in_use", False)
+                and acc.get("account_type", "default") == account_type  # 账号类型过滤
             ]
             
             if not available_accounts:
                 # 如果没有可用账号，尝试清理残留状态
-                logger.warning(f"没有可用账号，尝试清理残留状态...")
+                logger.warning(f"没有可用账号（类型: {account_type}），尝试清理残留状态...")
                 current_time = datetime.now()
                 stale_threshold = timedelta(minutes=5)  # 5分钟前的账号认为已过期
                 
@@ -231,7 +240,7 @@ class DataManager:
                     self._save_account_pool(data, lock_acquired=True)
             
             # 再次查找可用账号
-            # 选择策略：优先选“最久未使用”的账号，避免集中使用同一账号触发后端 lockout
+            # 选择策略：优先选"最久未使用"的账号，避免集中使用同一账号触发后端 lockout
             def _last_used_key(acc):
                 last_used = acc.get("last_used")
                 if not last_used:
@@ -246,6 +255,7 @@ class DataManager:
             candidates = [
                 acc for acc in pool
                 if not acc.get("is_locked", False) and not acc.get("in_use", False)
+                and acc.get("account_type", "default") == account_type  # 账号类型过滤
             ]
             candidates.sort(key=lambda a: (_last_used_key(a), a.get("username", "")))
 
@@ -274,7 +284,54 @@ class DataManager:
                 }
             
             # 如果还是没有可用账号，抛出异常
-            raise RuntimeError(f"没有可用的测试账号，测试用例: {test_name}。总账号数: {len(pool)}, 可用: {len(available_accounts)}")
+            err_msg = (
+                f"没有可用的测试账号（类型: {account_type}）。"
+                f"测试用例: {test_name}，总账号数: {len(pool)}，可用: {len(available_accounts)}"
+            )
+            raise RuntimeError(err_msg)
+    
+    def get_test_account_with_retry(
+        self, 
+        test_name: str, 
+        account_type: str = "default",
+        max_retries: int = 3,
+        retry_delay_s: float = 0.5
+    ) -> Dict[str, str]:
+        """
+        带重试的账号分配（并发环境下更稳定）
+        
+        Args:
+            test_name: 测试用例名称
+            account_type: 账号类型
+            max_retries: 最大重试次数（默认 3）
+            retry_delay_s: 重试延迟（秒，指数退避）
+            
+        Returns:
+            测试账号信息
+            
+        Raises:
+            RuntimeError: 重试耗尽后仍无可用账号
+        """
+        import time
+        
+        for attempt in range(max_retries):
+            try:
+                account = self.get_test_account(test_name, account_type=account_type)
+                if attempt > 0:
+                    logger.info(f"✅ 重试成功：第 {attempt + 1} 次尝试分配账号成功")
+                return account
+            except RuntimeError as e:
+                if attempt < max_retries - 1:
+                    delay = retry_delay_s * (2 ** attempt)  # 指数退避: 0.5s, 1s, 2s
+                    logger.warning(
+                        f"⚠️ 账号分配失败（类型: {account_type}），"
+                        f"重试 {attempt + 1}/{max_retries}，等待 {delay:.1f}s... "
+                        f"原因: {e}"
+                    )
+                    time.sleep(delay)
+                else:
+                    logger.error(f"❌ 账号分配失败：重试 {max_retries} 次后仍无可用账号（类型: {account_type}）")
+                    raise
     
     def cleanup_before_test(self, test_name: str) -> None:
         """

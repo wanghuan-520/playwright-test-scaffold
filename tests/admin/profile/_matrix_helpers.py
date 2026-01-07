@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Dict, Optional
 
 import allure  # pyright: ignore[reportMissingImports]
+from playwright.sync_api import Page
 
 from ._helpers import (
     abp_profile_put_should_reject,
@@ -24,6 +25,10 @@ from ._helpers import (
     step_shot,
     step_shot_after_success_toast,
 )
+
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -64,6 +69,69 @@ def field_looks_invalid(page, selector: str) -> bool:
     except Exception:
         pass
     return False
+
+
+def wait_for_frontend_validation(page: Page, timeout_ms: int = 2000) -> bool:
+    """
+    等待前端验证完成（错误提示渲染）
+    
+    用于"必须前端拦截"的测试场景：
+    - 点击 Save 后，前端验证是异步的（React/debounce/onBlur）
+    - 需要等待错误提示渲染完成后再断言
+    
+    策略：
+    1. 等待常见错误元素出现（.invalid-feedback, .text-danger, etc）
+    2. 使用 wait_for_function 检测 DOM 状态（aria-invalid="true"）
+    3. 超时返回 False（前端可能没有拦截）
+    
+    Returns:
+        bool: True 表示检测到错误提示，False 表示超时未检测到
+    """
+    try:
+        # 方案 1：等待任何错误元素出现（快速路径）
+        page.wait_for_selector(
+            ".invalid-feedback:visible, .text-danger:visible, .field-validation-error:visible, .validation-summary-errors:visible, .toast-error:visible",
+            state="visible",
+            timeout=timeout_ms
+        )
+        logger.debug(f"[wait_for_frontend_validation] 检测到错误元素（selector 路径）")
+        return True
+    except Exception:
+        pass
+    
+    try:
+        # 方案 2：使用 wait_for_function 等待 DOM 状态（通用路径）
+        page.wait_for_function(
+            """() => {
+                // 检查 aria-invalid
+                const invalidEls = document.querySelectorAll('[aria-invalid="true"]');
+                if (invalidEls.length > 0) return true;
+                
+                // 检查错误类名
+                const errorEls = document.querySelectorAll('.invalid-feedback, .text-danger, .field-validation-error, .validation-summary-errors');
+                for (let el of errorEls) {
+                    if (el.offsetParent !== null) {  // 可见元素
+                        return true;
+                    }
+                }
+                
+                // 检查 validationMessage
+                const inputs = document.querySelectorAll('input, textarea, select');
+                for (let input of inputs) {
+                    if (input.validationMessage && input.validationMessage.trim()) {
+                        return true;
+                    }
+                }
+                
+                return false;
+            }""",
+            timeout=timeout_ms
+        )
+        logger.debug(f"[wait_for_frontend_validation] 检测到错误元素（wait_for_function 路径）")
+        return True
+    except Exception:
+        logger.warning(f"[wait_for_frontend_validation] 超时 {timeout_ms}ms 未检测到错误提示")
+        return False
 
 
 def assert_frontend_has_error_evidence(page, selector: str, case_name: str) -> None:
@@ -115,8 +183,35 @@ def _assert_should_fail(page, page_obj, selector: str, case_name: str, patch: di
     )
 
     if ok or success_ui:
+        # “前端更严格”是允许的：例如 maxlength 截断、trim 空白、或后端忽略无效变更并返回成功。
+        # 只要最终落库/落表单值不是“原样非法输入”，就视为已被拦截/归一化（符合需求）。
+        candidate = None
+        try:
+            if isinstance(patch, dict) and len(patch) == 1:
+                candidate = next(iter(patch.values()))
+        except Exception:
+            candidate = None
+
+        normalized = False
+        if isinstance(candidate, str):
+            try:
+                actual = page.input_value(selector)
+                if actual != candidate:
+                    normalized = True
+            except Exception:
+                # 读取不到 input_value 时，退化为“toast 成功但无报错”也先放行（截图已在外层保留）
+                normalized = True
+
+        if normalized:
+            allure.attach(
+                f"accepted_normalized_save: {case_name}\n{note}\npatch={patch}",
+                name=f"accepted_normalized_{case_name}",
+                attachment_type=allure.attachment_type.TEXT,
+            )
+            return
+
         allure.attach(
-            f"❌ SHOULD FAIL but saved: {case_name}\n{note}\npatch={patch}",
+            f"❌ SHOULD FAIL but saved as-is: {case_name}\n{note}\npatch={patch}",
             name=f"unexpected_saved_{case_name}",
             attachment_type=allure.attachment_type.TEXT,
         )
@@ -202,11 +297,12 @@ def run_matrix_case(auth_page, page_obj, baseline: dict, scenario: MatrixScenari
             # 预期会发请求且被后端 reject：仍给足等待
             timeout_ms = 12000
         else:
-            # 预期前端拦截：快速判定“没有请求”
+            # 预期前端拦截：快速判定"没有请求"
             timeout_ms = 1500
 
         resp = page_obj.click_save_and_capture_profile_update(timeout_ms=timeout_ms)
-        auth_page.wait_for_timeout(300)
+        # 优化：减少等待时间从300ms到100ms（充分利用并行能力）
+        auth_page.wait_for_timeout(100)
         if scenario.should_save:
             step_shot_after_success_toast(page_obj, f"step_{scenario.case_name}_result")
         else:

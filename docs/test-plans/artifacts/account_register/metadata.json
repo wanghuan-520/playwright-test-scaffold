@@ -1,0 +1,31 @@
+{
+  "slug": "account_register",
+  "url": "https://localhost:44320/Account/Register",
+  "final_url": "https://localhost:44320/Account/Register",
+  "title": "MyApplication",
+  "auth_required": false,
+  "evidence_files": [
+    "visible.html",
+    "visible.txt",
+    "page.png",
+    "metadata.json",
+    "abp_app_config.json",
+    "backend_swagger.json",
+    "abp_rules_extract.json"
+  ],
+  "locator_hints": {
+    "tabs": {},
+    "inputs": {
+      "username": "role=textbox[name=\"Username *\"]",
+      "email_address": "role=textbox[name=\"Email address *\"]",
+      "password": "role=textbox[name=\"Password *\"]"
+    },
+    "buttons": {
+      "english": "role=button[name=\" English\"]",
+      "register": "role=button[name=\"Register\"]"
+    },
+    "links": {
+      "login": "role=link[name=\"Login\"]"
+    }
+  }
+}

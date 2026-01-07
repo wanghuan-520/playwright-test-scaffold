@@ -65,7 +65,8 @@ class PageUtils:
         try:
             self.page.wait_for_selector(selector, state="visible", timeout=timeout)
             self.page.fill(selector, value, timeout=timeout)
-            logger.debug(f"✓ 填写成功: {selector} = {value}")
+            # 安全：禁止把输入值写进日志（可能包含密码/Token/PII）
+            logger.debug(f"✓ 填写成功: {selector} (len={len(value or '')})")
             return True
         except Exception as e:
             logger.error(f"✗ 填写失败: {selector} - {e}")
@@ -85,7 +86,8 @@ class PageUtils:
         try:
             self.page.wait_for_selector(selector, state="visible", timeout=timeout)
             text = self.page.text_content(selector, timeout=timeout)
-            logger.debug(f"获取文本: {selector} = {text}")
+            # 安全：避免把页面文本直接落日志（可能包含 PII）；仅记录长度
+            logger.debug(f"获取文本: {selector} (len={len(text or '')})")
             return text
         except Exception as e:
             logger.error(f"✗ 获取文本失败: {selector} - {e}")

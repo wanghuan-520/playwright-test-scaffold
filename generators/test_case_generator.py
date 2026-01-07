@@ -58,7 +58,15 @@ class TestCaseGenerator:
         deriver = RuleDeriver.from_config(cfg)
         rules = deriver.derive(page_info)
 
-        has_static_repo = bool(cfg.get("repositories.frontend.local_path", "")) or bool(cfg.get("repositories.backend.local_path", ""))
+        # 只有当本地 repo 路径真实存在（可读）时，才强制“必须推导规则”。
+        # config/project.yaml 可能包含占位路径（/path/to/your/frontend），不能因此拒绝生成。
+        def _exists(p: str) -> bool:
+            try:
+                return bool(p) and Path(str(p)).expanduser().exists()
+            except Exception:
+                return False
+
+        has_static_repo = _exists(cfg.get("repositories.frontend.local_path", "")) or _exists(cfg.get("repositories.backend.local_path", ""))
         if has_static_repo and not rules:
             raise RuntimeError(
                 "Static rule derivation failed (repositories.*.local_path provided but no rules derived). "

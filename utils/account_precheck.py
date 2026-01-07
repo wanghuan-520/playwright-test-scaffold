@@ -15,6 +15,7 @@
 
 import argparse
 import os
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
@@ -25,6 +26,12 @@ import ssl
 import urllib.request
 import urllib.error
 from urllib.parse import urlencode
+
+try:
+    import requests
+    HAS_REQUESTS = True
+except ImportError:
+    HAS_REQUESTS = False
 
 from utils.config import ConfigManager
 from utils.data_manager import DataManager
@@ -78,26 +85,44 @@ def _http_post_json(
     *,
     opener: Optional[urllib.request.OpenerDirector] = None,
     timeout_s: int = 20,
+    max_retries: int = 3,
 ) -> Tuple[int, str]:
+    """
+    POST JSON data with retry logic for SSL connection issues.
+    """
     ctx = ssl._create_unverified_context()
     body = _json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(url, data=body, method="POST")
     req.add_header("content-type", "application/json")
-    try:
-        if opener is None:
-            with urllib.request.urlopen(req, context=ctx, timeout=timeout_s) as r:
+    
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            if opener is None:
+                with urllib.request.urlopen(req, context=ctx, timeout=timeout_s) as r:
+                    raw = r.read()
+                    return r.status, raw.decode("utf-8", "ignore")
+            with opener.open(req, timeout=timeout_s) as r:
                 raw = r.read()
                 return r.status, raw.decode("utf-8", "ignore")
-        with opener.open(req, timeout=timeout_s) as r:
-            raw = r.read()
-            return r.status, raw.decode("utf-8", "ignore")
-    except urllib.error.HTTPError as e:
-        raw = b""
-        try:
-            raw = e.read()
-        except Exception:
-            pass
-        return e.code, raw.decode("utf-8", "ignore")
+        except urllib.error.HTTPError as e:
+            # HTTP errors are not retryable, return immediately
+            raw = b""
+            try:
+                raw = e.read()
+            except Exception:
+                pass
+            return e.code, raw.decode("utf-8", "ignore")
+        except (ssl.SSLError, urllib.error.URLError, OSError) as e:
+            # Network/SSL errors are retryable
+            last_error = e
+            if attempt < max_retries - 1:
+                wait_time = 0.5 * (2 ** attempt)  # Exponential backoff: 0.5s, 1s, 2s
+                logger.debug(f"[_http_post_json] Attempt {attempt + 1}/{max_retries} failed: {type(e).__name__}: {e}. Retrying in {wait_time}s...")
+                time.sleep(wait_time)
+            else:
+                logger.warning(f"[_http_post_json] All {max_retries} attempts failed. Last error: {type(e).__name__}: {e}")
+                raise
 
 
 def _http_get(url: str, headers: Optional[Dict[str, str]] = None, timeout_s: int = 15) -> Tuple[int, str]:
@@ -189,7 +214,50 @@ def _abp_cookie_login_and_roles(
     不依赖 OIDC client：
     1) POST /api/account/login（JSON）
     2) 复用 cookie GET /api/abp/application-configuration，读取 roles
+    
+    优先使用 requests 库（更好的 SSL 兼容性），fallback 到 urllib
     """
+    login_url = f"{backend_url.rstrip('/')}/api/account/login"
+    payload = {"userNameOrEmailAddress": identifier, "password": password, "rememberMe": False}
+    
+    if HAS_REQUESTS:
+        # 使用 requests 库（推荐）
+        try:
+            import requests
+            requests.packages.urllib3.disable_warnings()  # Suppress InsecureRequestWarning
+            
+            session = requests.Session()
+            session.verify = False  # 禁用SSL验证
+            
+            # 登录
+            resp = session.post(login_url, json=payload, timeout=20)
+            if resp.status_code != 200:
+                return False, f"login_status={resp.status_code}", [], False
+            
+            body = resp.json()
+            reason = _classify_abp_login_result(_json.dumps(body))
+            if reason != "login_Success":
+                return False, reason, [], False
+            
+            # 获取配置
+            cfg_url = f"{backend_url.rstrip('/')}/api/abp/application-configuration"
+            cfg_resp = session.get(cfg_url, timeout=20)
+            if cfg_resp.status_code != 200:
+                return False, f"abp_cfg_status={cfg_resp.status_code}", [], False
+            
+            cfg_data = cfg_resp.json()
+            cu = cfg_data.get("currentUser") or {}
+            authenticated = bool(cu.get("isAuthenticated"))
+            roles = [str(x) for x in (cu.get("roles") or [])]
+            
+            if not authenticated:
+                return False, "not_authenticated", roles, False
+            return True, "ok", roles, True
+            
+        except Exception as e:
+            logger.warning(f"[_abp_cookie_login_and_roles] requests failed: {type(e).__name__}: {e}, falling back to urllib")
+    
+    # Fallback: 使用 urllib（旧版本，可能有SSL兼容性问题）
     ctx = ssl._create_unverified_context()
     jar = http.cookiejar.CookieJar()
     opener = urllib.request.build_opener(
@@ -197,8 +265,6 @@ def _abp_cookie_login_and_roles(
         urllib.request.HTTPCookieProcessor(jar),
     )
 
-    login_url = f"{backend_url.rstrip('/')}/api/account/login"
-    payload = {"userNameOrEmailAddress": identifier, "password": password, "rememberMe": False}
     st, body = _http_post_json(login_url, payload, opener=opener, timeout_s=20)
     if st != 200:
         return False, f"login_status={st}", [], False

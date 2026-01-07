@@ -1,5 +1,10 @@
 """
 Profile Settings - P1 Name Validation Matrix
+
+优化说明：
+- 将原 for 循环改为 pytest.mark.parametrize，每个场景独立执行
+- 可充分利用 pytest-xdist 并行能力，显著提升速度
+- 失败隔离更好，报告更清晰
 """
 
 from __future__ import annotations
@@ -10,6 +15,49 @@ import pytest  # pyright: ignore[reportMissingImports]
 from utils.logger import TestLogger
 from tests.admin.profile._helpers import AbpUserConsts
 from tests.admin.profile._matrix_helpers import MatrixScenario, rand_suffix, run_matrix_case
+
+
+# ═══════════════════════════════════════════════════════════════
+# 参数化场景列表
+# ═══════════════════════════════════════════════════════════════
+def _name_scenarios():
+    """
+    生成参数化场景：9个场景，包含完整边界值测试
+    """
+    max_len = AbpUserConsts.MaxNameLength  # 64
+    name_max_minus_1 = "N" * (max_len - 1)  # 63
+    name_max = "N" * max_len  # 64
+    name_max_plus_1 = "N" * (max_len + 1)  # 65
+    
+    # 注意：suf 需要在 test 函数中动态生成，这里只定义静态部分
+    scenarios = [
+        ("name_empty", "NAME_INPUT", {"name": ""}, True, "可空", False, False, False),
+        ("name_whitespace", "NAME_INPUT", {"name": "   "}, True, "可空/空白", False, False, False),
+        ("name_en", "NAME_INPUT", {"name": "John"}, True, "英文", True, False, False),  # suf will be added
+        ("name_cn", "NAME_INPUT", {"name": "中文"}, True, "中文允许（ABP 默认）", True, False, False),
+        ("name_mix_special", "NAME_INPUT", {"name": "O'Brien-!@#"}, True, "特殊字符允许（ABP 默认）", True, False, False),
+        ("name_emoji", "NAME_INPUT", {"name": "User🙂"}, True, "Emoji", True, False, False),
+        ("name_len_max_minus_1", "NAME_INPUT", {"name": name_max_minus_1}, True, "最大长度-1（63）应成功", False, False, False),
+        ("name_len_max_64", "NAME_INPUT", {"name": name_max}, True, "最大长度（64）应成功", False, False, False),
+        ("name_len_max_plus_1", "NAME_INPUT", {"name": name_max_plus_1}, False, "超长（65）应失败", False, False, False),
+    ]
+    
+    params = []
+    for case_name, selector_attr, patch, should_save, note, need_suffix, require_frontend_error, require_backend_reject in scenarios:
+        params.append(
+            pytest.param(
+                case_name,
+                selector_attr,
+                patch,
+                should_save,
+                note,
+                need_suffix,
+                require_frontend_error,
+                require_backend_reject,
+                id=case_name,
+            )
+        )
+    return params
 
 
 @pytest.mark.P1
@@ -24,32 +72,57 @@ from tests.admin.profile._matrix_helpers import MatrixScenario, rand_suffix, run
 - 字符集：英文、中文、常见特殊字符、Emoji（按 ABP 默认不限制字符集）
 - 长度：最大 64 / 超长 65
 - 证据：每个场景 2 张关键截图（filled / result）
+
+优化：使用参数化测试，每个场景独立执行，可并行
 """
 )
-def test_p1_profile_name_validation_matrix(profile_settings):
-    logger = TestLogger("test_p1_profile_name_validation_matrix")
+@pytest.mark.parametrize(
+    "case_name,selector_attr,patch,should_save,note,need_suffix,require_frontend_error,require_backend_reject",
+    _name_scenarios(),
+)
+def test_p1_profile_name_validation_matrix(
+    profile_settings,
+    case_name: str,
+    selector_attr: str,
+    patch: dict,
+    should_save: bool,
+    note: str,
+    need_suffix: bool,
+    require_frontend_error: bool,
+    require_backend_reject: bool,
+):
+    logger = TestLogger(f"test_p1_profile_name_validation_matrix[{case_name}]")
     logger.start()
 
     auth_page, page_obj, baseline = profile_settings
-    suf = rand_suffix(auth_page)
-
-    max_len = AbpUserConsts.MaxNameLength
-    name_max = "N" * max_len
-    name_over = "O" * (max_len + 1)
-
-    scenarios = [
-        MatrixScenario("name_empty", page_obj.NAME_INPUT, {"name": ""}, True, "可空"),
-        MatrixScenario("name_whitespace", page_obj.NAME_INPUT, {"name": "   "}, True, "可空/空白"),
-        MatrixScenario("name_en", page_obj.NAME_INPUT, {"name": f"John_{suf}"}, True, "英文"),
-        MatrixScenario("name_cn", page_obj.NAME_INPUT, {"name": f"中文{suf}"}, True, "中文允许（ABP 默认）"),
-        MatrixScenario("name_mix_special", page_obj.NAME_INPUT, {"name": f"O'Brien-{suf}!@#"}, True, "特殊字符允许（ABP 默认）"),
-        MatrixScenario("name_emoji", page_obj.NAME_INPUT, {"name": f"User🙂{suf}"}, True, "Emoji"),
-        MatrixScenario("name_len_max_64", page_obj.NAME_INPUT, {"name": name_max}, True, "最大长度 64"),
-        MatrixScenario("name_len_over_65", page_obj.NAME_INPUT, {"name": name_over}, False, "超长 65", require_frontend_error_evidence=True),
-    ]
-
-    for sc in scenarios:
-        run_matrix_case(auth_page, page_obj, baseline, sc)
+    
+    # 动态添加 suffix（如果需要）
+    if need_suffix:
+        suf = rand_suffix(auth_page)
+        patch_copy = {}
+        for k, v in patch.items():
+            if isinstance(v, str) and v:
+                patch_copy[k] = f"{v}_{suf}"
+            else:
+                patch_copy[k] = v
+        patch = patch_copy
+    
+    # 获取 selector
+    selector = getattr(page_obj, selector_attr)
+    
+    # 构造 MatrixScenario 并执行
+    scenario = MatrixScenario(
+        case_name=case_name,
+        selector=selector,
+        patch=patch,
+        should_save=should_save,
+        note=note,
+        require_frontend_error_evidence=require_frontend_error,
+        require_backend_reject=require_backend_reject,
+        allow_taken_conflict=False,
+    )
+    
+    run_matrix_case(auth_page, page_obj, baseline, scenario)
 
     logger.end(success=True)
 

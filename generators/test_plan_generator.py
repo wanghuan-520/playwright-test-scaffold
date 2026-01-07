@@ -21,6 +21,7 @@ from generators.utils import (
     to_class_name,
     requires_auth,
 )
+from urllib.parse import urlparse
 from generators.test_plan_formatter import TestPlanFormatter
 from generators.test_plan_scenarios import TestPlanScenarios
 from utils.logger import get_logger
@@ -55,11 +56,17 @@ class TestPlanGenerator:
         slug = get_file_name_from_url(page_info.url)
         page_name = get_page_name_from_url(page_info.url)
         class_name = f"{to_class_name(page_name)}Page"
-        need_auth = "是" if requires_auth(page_info.page_type) else "否"
+        # 认证前置：优先使用动态分析给出的结论（更接近真实环境）
+        auth_required = (
+            page_info.auth_required
+            if isinstance(getattr(page_info, "auth_required", None), bool)
+            else requires_auth(page_info.page_type)
+        )
+        need_auth = "是" if auth_required else "否"
 
         overview = self._overview_lines(page_info)
         risk = self._risk_lines(page_info)
-        mapping = self._element_mapping_table(page_info)
+        mapping = self._element_mapping_table(page_info, auth_required=auth_required)
         pom = self._pom_skeleton(page_info, class_name=class_name)
         cases = self._cases_block(page_info)
         data = self._test_data_json(page_info)
@@ -185,7 +192,7 @@ class TestPlanGenerator:
             return " / ".join(pts)
         return "可见 / 可交互 / 行为正确"
 
-    def _element_mapping_table(self, page_info: PageInfo) -> str:
+    def _element_mapping_table(self, page_info: PageInfo, *, auth_required: bool) -> str:
         rows = []
         for e in (page_info.elements or []):
             strategy, locator = self._locator_suggestion(e)
@@ -198,7 +205,7 @@ class TestPlanGenerator:
                     st=strategy,
                     loc=locator,
                     chk=self._checkpoints(e),
-                    dep="需要登录态" if requires_auth(page_info.page_type) else "无",
+                    dep="需要登录态" if auth_required else "无",
                 )
             )
         if not rows:
@@ -246,11 +253,21 @@ class TestPlanGenerator:
         )
 
     def _cases_block(self, page_info: PageInfo) -> str:
-        # 对齐模板，给出可执行的用例骨架；内容尽量贴合 password change
-        url = (page_info.url or "").lower()
-        is_pwd = "password" in url
+        url = (page_info.url or "").strip()
+        path = (urlparse(url).path or "/").lower()
 
-        base = [
+        # 账号建议（只写 email，不写密码）
+        # - 普通账号：个人设置/工作流等
+        # - 管理员账号：用户/角色/设置等 admin-only 页面
+        account_hint = [
+            "- **账号建议**:",
+            "  - **普通账号 email（示例）**: `hayleetest1@test.com`（用于个人设置/Workflow 等）",
+            "  - **管理员账号 email（示例）**: `admin-test01@test.com`（用于 Users/Roles/Settings 等管理页）",
+            "  - **密码**: 运行期由环境变量/账号池提供；计划与任何落盘文件禁止写入密码",
+            "",
+        ]
+
+        base_p0 = [
             "- **TC001**: 页面加载",
             "  - **标签**: [@smoke @p0]",
             "  - **前置条件**: 已登录（若需要）",
@@ -258,11 +275,232 @@ class TestPlanGenerator:
             "  - **预期结果**: 页面可用且无阻塞错误",
             "  - **断言层级**: UI 状态",
             "  - **优先级**: 高",
+            "",
         ]
 
-        if not is_pwd:
-            return "\n".join(["### 3.1 功能测试用例", *base, "", "### 3.2 边界测试用例", "", "### 3.3 异常测试用例"])
+        # ──────────────────────────────────────────────────────────
+        # Account pages (backend)
+        # ──────────────────────────────────────────────────────────
+        if path.startswith("/account/login"):
+            cases = [
+                *account_hint,
+                *base_p0,
+                "- **TC002**: 登录成功（有效凭证）",
+                "  - **标签**: [@p0 @auth]",
+                "  - **前置条件**: 有效账号（通过账号池/环境变量注入）",
+                "  - **测试步骤**: 输入用户名/邮箱 + 密码 → 点击 Login → 等待跳转",
+                "  - **预期结果**: 登录成功并回跳到前端域（`https://localhost:3000`）或进入授权后的目标页",
+                "  - **断言层级**: UI 状态 + URL/可观测用户菜单",
+                "  - **优先级**: 高",
+                "",
+                "- **TC003**: 登录失败（错误密码）",
+                "  - **标签**: [@p0 @negative]",
+                "  - **测试步骤**: 输入正确用户名 + 错误密码 → Login",
+                "  - **预期结果**: 显示错误提示；不会建立前端登录态",
+                "  - **断言层级**: UI 可观测错误 + 仍停留登录页",
+                "  - **优先级**: 高",
+                "",
+                "- **TC004**: 必填校验（用户名/密码为空）",
+                "  - **标签**: [@p1 @validation]",
+                "  - **测试步骤**: 清空用户名或密码 → Login",
+                "  - **预期结果**: 表单显示必填提示或阻止提交",
+                "  - **优先级**: 中",
+                "",
+                "- **TC-SEC-001**: 防账号枚举（错误提示不区分“用户不存在/密码错误”）",
+                "  - **标签**: [@p1 @security]",
+                "  - **测试步骤**: 分别用不存在账号/存在账号错误密码尝试登录",
+                "  - **预期结果**: 错误提示保持同一风格，不泄露账号存在性",
+                "  - **优先级**: 中",
+            ]
+            return "\n".join(["### 3.1 功能测试用例", *cases, "", "### 3.2 边界测试用例", "", "### 3.3 异常测试用例"])
 
+        if path.startswith("/account/register"):
+            cases = [
+                *account_hint,
+                *base_p0,
+                "- **TC002**: 注册页字段可输入 + 提交按钮可用性",
+                "  - **标签**: [@p0]",
+                "  - **测试步骤**: 填写必填项（以页面可见标识为准）→ 提交",
+                "  - **预期结果**: 成功注册或得到可诊断的校验提示（不出现 5xx）",
+                "  - **优先级**: 高",
+                "",
+                "- **TC003**: Email 格式校验",
+                "  - **标签**: [@p1 @validation]",
+                "  - **测试步骤**: 输入非法 email（如缺少 @）→ 提交",
+                "  - **预期结果**: 前端或后端拒绝并展示错误证据（字段 invalid/提示/4xx）",
+                "  - **优先级**: 中",
+                "",
+                "- **TC004**: 密码策略矩阵（以后端 ABP 为真理源）",
+                "  - **标签**: [@p1 @validation]",
+                "  - **测试步骤**: 使用不满足策略的密码（缺数字/缺大写/太短等）→ 提交",
+                "  - **预期结果**: 被拒绝；提示可观测；不落盘任何密码样例",
+                "  - **优先级**: 中",
+                "",
+                "- **TC-SEC-001**: 注册失败不泄露敏感信息（错误体/提示不包含密码明文）",
+                "  - **标签**: [@p1 @security]",
+                "  - **优先级**: 中",
+            ]
+            return "\n".join(["### 3.1 功能测试用例", *cases, "", "### 3.2 边界测试用例", "", "### 3.3 异常测试用例"])
+
+        if path.startswith("/account/forgotpassword"):
+            cases = [
+                *account_hint,
+                *base_p0,
+                "- **TC002**: 找回密码提交（存在/不存在账号都应给出同风格反馈）",
+                "  - **标签**: [@p0]",
+                "  - **测试步骤**: 输入 email → Submit",
+                "  - **预期结果**: 显示“已发送邮件/若账号存在则发送”类提示；不泄露账号是否存在",
+                "  - **优先级**: 高",
+                "",
+                "- **TC003**: Email 格式校验",
+                "  - **标签**: [@p1 @validation]",
+                "  - **测试步骤**: 输入非法 email → Submit",
+                "  - **预期结果**: 可观测错误提示",
+                "  - **优先级**: 中",
+                "",
+                "- **TC-SEC-001**: 防账号枚举（提示一致性）",
+                "  - **标签**: [@p1 @security]",
+                "  - **优先级**: 中",
+            ]
+            return "\n".join(["### 3.1 功能测试用例", *cases, "", "### 3.2 边界测试用例", "", "### 3.3 异常测试用例"])
+
+        # ──────────────────────────────────────────────────────────
+        # Admin / Settings / Users / Roles
+        # ──────────────────────────────────────────────────────────
+        if path.startswith("/admin/users/roles"):
+            cases = [
+                *account_hint,
+                *base_p0,
+                "- **TC002**: 角色列表可用（加载/空态/错误态）",
+                "  - **标签**: [@p0]",
+                "  - **前置条件**: 管理员登录",
+                "  - **测试步骤**: 打开页面 → 等待列表区域渲染",
+                "  - **预期结果**: 列表渲染成功（无 5xx / 无阻塞报错）",
+                "  - **优先级**: 高",
+                "",
+                "- **TC003**: 未授权拦截",
+                "  - **标签**: [@p1 @auth]",
+                "  - **前置条件**: 未登录/非管理员账号",
+                "  - **预期结果**: 被拦截或重定向到登录；不得展示管理数据",
+                "  - **优先级**: 中",
+            ]
+            return "\n".join(["### 3.1 功能测试用例", *cases, "", "### 3.2 边界测试用例", "", "### 3.3 异常测试用例"])
+
+        if path.startswith("/admin/users"):
+            cases = [
+                *account_hint,
+                *base_p0,
+                "- **TC002**: 用户列表加载",
+                "  - **标签**: [@p0]",
+                "  - **前置条件**: 管理员登录",
+                "  - **测试步骤**: 打开页面 → 等待用户列表/表格区域渲染",
+                "  - **预期结果**: 列表渲染成功（空态/加载态可接受，但不得 5xx）",
+                "  - **优先级**: 高",
+                "",
+                "- **TC003**: 搜索过滤（Search...）",
+                "  - **标签**: [@p1]",
+                "  - **测试步骤**: 在 Search 输入框输入关键字 → 观察列表变化",
+                "  - **预期结果**: 列表过滤结果可观测（行数变化/空态提示）",
+                "  - **优先级**: 中",
+                "",
+                "- **TC-SEC-001**: 未授权拦截",
+                "  - **标签**: [@p1 @security @auth]",
+                "  - **前置条件**: 未登录/非管理员",
+                "  - **预期结果**: 被拦截或重定向；不得暴露用户数据",
+                "  - **优先级**: 中",
+            ]
+            return "\n".join(["### 3.1 功能测试用例", *cases, "", "### 3.2 边界测试用例", "", "### 3.3 异常测试用例"])
+
+        if path.startswith("/admin/settings/feature-management"):
+            cases = [
+                *account_hint,
+                *base_p0,
+                "- **TC002**: 打开 Feature Management 页",
+                "  - **标签**: [@p0]",
+                "  - **前置条件**: 管理员登录",
+                "  - **测试步骤**: 打开页面 → 断言 Feature Management 标题/关键按钮可见",
+                "  - **预期结果**: 页面可用；按钮可点击（不出现 5xx）",
+                "  - **优先级**: 高",
+                "",
+                "- **TC003**: Manage Host Features 按钮行为",
+                "  - **标签**: [@p1]",
+                "  - **测试步骤**: 点击按钮 → 观察弹窗/跳转/加载状态（以实际为准）",
+                "  - **预期结果**: 行为可观测且可关闭/可回退",
+                "  - **优先级**: 中",
+                "",
+                "- **TC-SEC-001**: 未授权拦截",
+                "  - **标签**: [@p1 @security @auth]",
+                "  - **优先级**: 中",
+            ]
+            return "\n".join(["### 3.1 功能测试用例", *cases, "", "### 3.2 边界测试用例", "", "### 3.3 异常测试用例"])
+
+        if path.startswith("/admin/settings"):
+            cases = [
+                *account_hint,
+                *base_p0,
+                "- **TC002**: Settings Tab 切换（Emailing / Feature management）",
+                "  - **标签**: [@p0]",
+                "  - **前置条件**: 管理员登录",
+                "  - **测试步骤**: 点击 Emailing → 点击 Feature management → 再切回",
+                "  - **预期结果**: Tab 内容切换正确，状态不丢失（以实际为准）",
+                "  - **优先级**: 高",
+                "",
+                "- **TC003**: Emailing 表单保存（最小修改）",
+                "  - **标签**: [@p0]",
+                "  - **测试步骤**: 修改一个非敏感字段（如 Display name）→ 保存（若存在 Save/提交行为）",
+                "  - **预期结果**: 成功提示或可观测保存结果；不出现 5xx",
+                "  - **优先级**: 高",
+                "",
+                "- **TC004**: Port 边界/类型校验（数字/范围）",
+                "  - **标签**: [@p1 @validation]",
+                "  - **测试步骤**: 输入非法端口（负数/非数字/超范围）→ 保存",
+                "  - **预期结果**: 被拦截或后端拒绝；错误可观测",
+                "  - **优先级**: 中",
+                "",
+                "- **TC-SEC-001**: 密码字段不回显明文",
+                "  - **标签**: [@p1 @security]",
+                "  - **预期结果**: 密码输入框为 password 类型；截图/日志不出现明文",
+                "  - **优先级**: 中",
+            ]
+            return "\n".join(["### 3.1 功能测试用例", *cases, "", "### 3.2 边界测试用例", "", "### 3.3 异常测试用例"])
+
+        # ──────────────────────────────────────────────────────────
+        # Workflow / Home / Generic protected
+        # ──────────────────────────────────────────────────────────
+        if path.startswith("/workflow"):
+            cases = [
+                *account_hint,
+                *base_p0,
+                "- **TC002**: New Workflow 按钮可用",
+                "  - **标签**: [@p0]",
+                "  - **测试步骤**: 打开页面 → 点击 New Workflow（若存在）",
+                "  - **预期结果**: 弹窗/跳转可观测；可关闭/可回退",
+                "  - **优先级**: 高",
+                "",
+                "- **TC003**: Import Workflow 基础校验",
+                "  - **标签**: [@p1]",
+                "  - **测试步骤**: 点击 Import Workflow → 不选择文件直接提交（或取消）",
+                "  - **预期结果**: 不崩溃；提示可观测",
+                "  - **优先级**: 中",
+                "",
+                "- **TC-SEC-001**: 未登录可访问性（若页面支持匿名）/或强制登录拦截（以实际为准）",
+                "  - **标签**: [@p1 @auth]",
+                "  - **优先级**: 中",
+            ]
+            return "\n".join(["### 3.1 功能测试用例", *cases, "", "### 3.2 边界测试用例", "", "### 3.3 异常测试用例"])
+
+        # Password-like pages（保留已补充的改密用例）
+        if "password" in path:
+            # 复用历史逻辑：改密页面的核心矩阵
+            base = [
+                "- **TC001**: 页面加载",
+                "  - **标签**: [@smoke @p0]",
+                "  - **前置条件**: 已登录（若需要）",
+                "  - **测试步骤**: 打开页面 → 等待稳定 → 关键元素可见",
+                "  - **预期结果**: 页面可用且无阻塞错误",
+                "  - **断言层级**: UI 状态",
+                "  - **优先级**: 高",
+            ]
         pwd_cases = [
             "- **TC002**: 必填校验（未填当前密码）",
             "  - **标签**: [@p0 @validation]",
@@ -285,37 +523,54 @@ class TestPlanGenerator:
             "  - **前置条件**: 已登录",
             "  - **测试步骤**: 输入错误当前密码 → 输入合法新密码/确认 → 提交",
             "  - **预期结果**: 显示错误提示；密码不被修改",
-            "  - **断言层级**: 业务结果（仍可用旧密码登录）/UI 提示",
+                "  - **断言层级**: 业务结果/UI 提示",
             "  - **优先级**: 高",
             "",
-            "- **TC005**: 修改成功",
+                "- **TC005**: 修改成功（建议回滚）",
             "  - **标签**: [@p0]",
             "  - **前置条件**: 已登录；账号可用于修改密码",
-            "  - **测试步骤**: 输入正确当前密码 → 输入合法新密码/确认 → 提交",
-            "  - **预期结果**: 成功提示；必要时要求重新登录/会话更新符合预期",
-            "  - **断言层级**: 业务结果 + UI 状态",
+                "  - **测试步骤**: 修改成功后立刻回滚到原密码（避免污染账号池）",
+                "  - **预期结果**: 两次提交都成功且可观测",
             "  - **优先级**: 高",
         ]
-
         sec = [
-            "- **TC006**: 未登录访问重定向/拦截",
+                "- **TC-SEC-001**: 未登录访问拦截",
             "  - **标签**: [@p1 @auth]",
             "  - **前置条件**: 未登录",
-            "  - **测试步骤**: 直接访问 URL",
-            "  - **预期结果**: 跳转到登录页或显示未授权提示",
-            "  - **断言层级**: UI 状态/可观察性",
+                "  - **预期结果**: 重定向到登录或提示未授权",
             "  - **优先级**: 中",
             "",
-            "- **TC007**: XSS 输入不执行",
+                "- **TC-SEC-002**: XSS 输入不执行",
             "  - **标签**: [@p1 @security]",
-            "  - **前置条件**: 已登录",
-            "  - **测试步骤**: 在输入框填入 `<script>alert(1)</script>` 等 payload → 提交",
-            "  - **预期结果**: 不弹窗；输入被当作普通字符串处理",
-            "  - **断言层级**: 可观察性（无 dialog）",
+                "  - **预期结果**: 不弹窗；输入不被当作 HTML 执行",
+                "  - **优先级**: 中",
+            ]
+            return "\n".join(
+                [
+                    "### 3.1 功能测试用例",
+                    *account_hint,
+                    *base,
+                    "",
+                    *pwd_cases,
+                    "",
+                    "### 3.2 边界测试用例",
+                    "",
+                    "### 3.3 异常测试用例",
+                    "",
+                    *sec,
+                ]
+            )
+
+        # Generic default
+        generic = [
+            *account_hint,
+            *base_p0,
+            "- **TC-SEC-001**: 未登录访问拦截（如页面受保护）",
+            "  - **标签**: [@p1 @auth]",
+            "  - **预期结果**: 跳转登录或提示未授权",
             "  - **优先级**: 中",
         ]
-
-        return "\n".join(["### 3.1 功能测试用例", *base, "", *pwd_cases, "", "### 3.2 边界测试用例", "", "### 3.3 异常测试用例", "", *sec])
+        return "\n".join(["### 3.1 功能测试用例", *generic, "", "### 3.2 边界测试用例", "", "### 3.3 异常测试用例"])
 
     def _test_data_json(self, page_info: PageInfo) -> dict:
         url = (page_info.url or "").lower()

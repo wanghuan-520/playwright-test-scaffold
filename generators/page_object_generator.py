@@ -57,6 +57,8 @@ class PageObjectGenerator:
         """生成 Page Object 代码"""
         class_name = to_class_name(get_page_name_from_url(page_info.url))
         url_path = extract_url_path(page_info.url)
+        # 对于跨域页面（例如后端 ABP /Account/*），直接使用完整 URL，避免 BasePage 默认拼接 frontend base_url
+        url_value = (page_info.url or "").strip() or url_path
         indicator = self._pick_page_loaded_indicator(page_info)
         
         selectors, name_map = self._gen_selectors(page_info)
@@ -92,8 +94,8 @@ class {class_name}Page(BasePage):
     
 {selectors}
     
-    URL = "{url_path}"
-    page_loaded_indicator = "{indicator}"
+    URL = {url_value!r}
+    page_loaded_indicator = {indicator!r}
     
     # ═══════════════════════════════════════════════════════════════
     # NAVIGATION
@@ -263,7 +265,8 @@ class {class_name}Page(BasePage):
 
             comment = get_element_comment(elem)
             lines.append(f"    # {comment}")
-            lines.append(f'    {const} = "{elem.selector}"')
+            # selector 内可能包含双引号（例如 role=button[name="Save"]），必须用 repr 安全输出
+            lines.append(f"    {const} = {elem.selector!r}")
             lines.append("")
 
         return ("\n".join(lines) if lines else "    pass"), selector_to_const
@@ -292,11 +295,17 @@ class {class_name}Page(BasePage):
         name = to_snake_case(elem.name or elem.id or elem.placeholder or "input")
         name = self._make_unique_name(name, used_methods)
         desc = elem.placeholder or elem.name or "input"
+        # 密码字段硬规则：不得把 value 打进日志；不得使用 BasePage.fill（会进入 debug 日志体系）
+        input_type = (elem.attributes or {}).get("type", "") if getattr(elem, "attributes", None) else ""
+        key = " ".join([elem.name or "", elem.id or "", elem.placeholder or "", desc]).lower()
+        is_password = (str(input_type).lower() == "password") or ("password" in key)
+        fill_call = "self.secret_fill" if is_password else "self.fill"
+        log_line = f'logger.info("填写 {desc}: ***")' if is_password else f'logger.info("填写 {desc} (len={{len(value)}})")'
         return f'''
     def fill_{name}(self, value: str) -> None:
         """填写 {desc}"""
-        logger.info(f"填写 {desc}: {{value}}")
-        self.fill(self.{const}, value)
+        {log_line}
+        {fill_call}(self.{const}, value)
     
     def get_{name}_value(self) -> str:
         """获取 {desc} 的值"""
@@ -321,6 +330,6 @@ class {class_name}Page(BasePage):
         return f'''
     def select_{name}(self, value: str) -> None:
         """选择 {desc}"""
-        logger.info(f"选择 {desc}: {{value}}")
+        logger.info(f"选择 {desc} (len={{len(value)}})")
         self.select_option(self.{const}, value)'''
     

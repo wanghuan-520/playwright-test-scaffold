@@ -1,3 +1,3 @@
-# Page folder: Change Password
+# package marker (for stable imports in pytest collection)
 
 

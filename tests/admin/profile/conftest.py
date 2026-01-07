@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import re
+import time
 from typing import Dict, Tuple
 
 import pytest
@@ -50,6 +51,53 @@ def _ensure_baseline(page_obj: PersonalSettingsPage) -> Dict[str, str]:
     - userName/email 是必填；如果当前值明显非法（空/超长/邮箱无 @），先修正再保存一次
     - baseline 值将用于 teardown 回滚（即使测试失败也执行）
     """
+    # 先确保页面真的加载到了“个人设置表单”，否则直接读 input_value 会卡 30s 超时，定位成本很高。
+    # 常见原因：
+    # - 登录态无效，被重定向到 /auth/login
+    # - 非 admin 账号访问 /admin/* 被重定向到 / 或无权限页
+    # - Profile 接口 401/500，页面渲染 Error/Loader，表单未出现
+    if page_obj.is_login_page():
+        debug_shot(page_obj, "baseline_fail_redirected_to_login")
+        pytest.fail(f"疑似未登录：访问 {page_obj.URL} 被重定向到登录页 url={page_obj.page.url}", pytrace=False)
+
+    deadline = time.time() + 20.0
+    while time.time() < deadline:
+        if page_obj.is_loaded():
+            break
+        try:
+            page_obj.page.wait_for_timeout(200)
+        except Exception:
+            break
+
+    if not page_obj.is_loaded():
+        # 采集最小诊断：当前 url + 关键接口状态（避免 30s selector 超时后只有一个空洞 TimeoutError）
+        debug_shot(page_obj, "baseline_fail_not_loaded")
+        try:
+            attach_backend_text("baseline_fail_current_url", str(page_obj.page.url))
+        except Exception:
+            pass
+        try:
+            frontend = (page_obj.config.get_service_url("frontend") or "").rstrip("/")
+            if frontend:
+                r_cfg = page_obj.page.context.request.get(f"{frontend}/api/abp/application-configuration")
+                attach_backend_text("baseline_fail_abp_cfg_status", str(r_cfg.status))
+                if r_cfg.ok:
+                    try:
+                        j = r_cfg.json() or {}
+                        cu = (j.get("currentUser") or {})
+                        attach_backend_text("baseline_fail_current_user", f"isAuthenticated={cu.get('isAuthenticated')} roles={cu.get('roles')}")
+                    except Exception:
+                        pass
+                r_prof = page_obj.page.context.request.get(f"{frontend}/api/account/my-profile")
+                attach_backend_text("baseline_fail_my_profile_status", str(r_prof.status))
+        except Exception:
+            pass
+
+        pytest.fail(
+            f"PersonalSettingsPage 未加载出表单（找不到 #userName/#email），url={page_obj.page.url}",
+            pytrace=False,
+        )
+
     current = page_obj.read_form_values()
     patch: Dict[str, str] = {}
 

@@ -5,7 +5,7 @@
 BasePage - 页面对象基类核心
 """
 
-from playwright.sync_api import Page
+from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError
 from abc import ABC, abstractmethod
 from typing import Optional
 from datetime import datetime
@@ -61,11 +61,58 @@ class BasePage(ABC, PageActions, PageWaits):
         url = path if path.startswith("http") else f"{self.base_url}{path}"
         logger.info(f"导航到: {url}")
         
-        # SPA / 长轮询场景下，等待 "load" 容易卡死（资源持续加载/连接不断开）
-        # 默认用 domcontentloaded，更符合“页面可交互”的定义。
-        wait_until = os.getenv("PAGE_GOTO_WAIT_UNTIL", "domcontentloaded").strip() or "domcontentloaded"
+        # 经验：某些页面在高并发/长连接/流式响应下，Playwright 的 domcontentloaded 可能触发很晚甚至不触发，
+        # 导致“页面已经渲染但 goto 仍超时”的假阴性。
+        # 这里默认用 commit，把“页面可交互”的判断交给后续 wait_for_page_load（load_state + selector）。
+        wait_until = os.getenv("PAGE_GOTO_WAIT_UNTIL", "commit").strip() or "commit"
         timeout_ms = int(os.getenv("PAGE_GOTO_TIMEOUT_MS", "60000"))
-        self.page.goto(url, wait_until=wait_until, timeout=timeout_ms)
+        retries = int(os.getenv("PAGE_GOTO_RETRIES", "1") or "1")
+        retry_delay_ms = int(os.getenv("PAGE_GOTO_RETRY_DELAY_MS", "400") or "400")
+        retry_wait_until = os.getenv("PAGE_GOTO_RETRY_WAIT_UNTIL", "commit").strip() or "commit"
+
+        last_err: Exception | None = None
+        for attempt in range(retries + 1):
+            try:
+                use_wait_until = wait_until
+                if attempt > 0 and retry_wait_until:
+                    use_wait_until = retry_wait_until
+                self.page.goto(url, wait_until=use_wait_until, timeout=timeout_ms)
+                last_err = None
+                break
+            except PlaywrightTimeoutError as e:
+                last_err = e
+                # 附证据：截图 + 关键元信息（更好定位“服务卡死/页面资源卡死/导航被阻塞”）
+                try:
+                    self.take_screenshot(name=f"goto_timeout_attempt_{attempt}", full_page=True)
+                except Exception:
+                    pass
+                try:
+                    import allure
+
+                    allure.attach(
+                        f"url={url}\nwait_until={wait_until}\nretry_wait_until={retry_wait_until!r}\n"
+                        f"timeout_ms={timeout_ms}\nattempt={attempt}/{retries}\ncurrent_url={self.page.url}\n",
+                        name=f"goto_timeout_attempt_{attempt}_meta",
+                        attachment_type=allure.attachment_type.TEXT,
+                    )
+                except Exception:
+                    pass
+
+                if attempt >= retries:
+                    raise
+                logger.warning(f"Page.goto timeout, retrying... attempt={attempt + 1}/{retries} url={url}")
+                # 重试前尽量把页面状态拉回“可控”，避免卡在半拉子导航里
+                try:
+                    self.page.goto("about:blank", wait_until="commit", timeout=5000)
+                except Exception:
+                    pass
+                try:
+                    self.page.wait_for_timeout(retry_delay_ms)
+                except Exception:
+                    pass
+
+        if last_err is not None:
+            raise last_err
         
         if wait_for_load:
             self.wait_for_page_load()
@@ -78,20 +125,40 @@ class BasePage(ABC, PageActions, PageWaits):
             timeout: 超时时间(毫秒)
         """
         logger.debug(f"等待页面加载: {self.__class__.__name__}")
-        # 可配置的 load_state（默认 networkidle；需要提速可用 domcontentloaded）
-        load_state = os.getenv("WAIT_FOR_LOAD_STATE", "networkidle").strip() or "networkidle"
-        self.page.wait_for_load_state(load_state, timeout=timeout)
-        
-        # 等待页面标识元素
+        # 允许的“安全跳转”：未登录访问受保护页面时可能跳转到登录页。
+        # 这类场景不应卡死在 page_loaded_indicator 上（否则 security 用例会被动等待超时）。
+        try:
+            url = (self.page.url or "").lower()
+            if ("/auth/login" in url) or ("/account/login" in url):
+                return
+        except Exception:
+            pass
+        # 可配置的 load_state：
+        # - 默认用 domcontentloaded：SPA/长连接/轮询页面下 networkidle 容易永远不满足，导致卡死/flake
+        # - 需要更“严格”时可显式设置 WAIT_FOR_LOAD_STATE=networkidle
+        load_state = os.getenv("WAIT_FOR_LOAD_STATE", "domcontentloaded").strip() or "domcontentloaded"
+        try:
+            self.page.wait_for_load_state(load_state, timeout=timeout)
+        except PlaywrightTimeoutError:
+            # 经验：某些页面（长连接/流式/高并发）可能永远达不到指定 load_state，
+            # 但关键交互元素已经可见。此处降级为“以 page_loaded_indicator 为准”。
+            logger.warning(f"wait_for_load_state timeout (state={load_state}), fallback to indicator={self.page_loaded_indicator!r}")
+
+        # 等待页面标识元素（这是“可交互”的硬判据）
         if self.page_loaded_indicator:
-            try:
-                self.page.wait_for_selector(
-                    self.page_loaded_indicator, 
-                    state="visible", 
-                    timeout=timeout
-                )
-            except Exception as e:
-                logger.warning(f"页面加载指示器未找到: {self.page_loaded_indicator}")
+            self.page.wait_for_selector(
+                self.page_loaded_indicator,
+                state="visible",
+                timeout=timeout,
+            )
+
+    def is_login_page(self) -> bool:
+        """默认判断：URL 指向登录页即视为 login page（子类可覆盖更精确的判断）。"""
+        try:
+            url = (self.page.url or "").lower()
+            return ("/auth/login" in url) or ("/account/login" in url)
+        except Exception:
+            return False
     
     def refresh(self) -> None:
         """刷新页面"""

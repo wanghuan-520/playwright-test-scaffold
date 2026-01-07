@@ -6,55 +6,68 @@
 """
 
 import logging
-import os
 import time
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
 
-def get_logger(name: str = __name__) -> logging.Logger:
+_ROOT_CONFIGURED = False
+
+
+def _ensure_root_logging_configured() -> None:
     """
-    获取日志记录器
-    
-    Args:
-        name: 日志记录器名称
-        
-    Returns:
-        logging.Logger: 配置好的日志记录器
+    只配置一次 root logger，避免每个 logger 名称都重复创建 handler。
+
+    说明：
+    - pytest 自身通常会配置 logging（见 pytest.ini 的 log_file 等），此时 root 已有 handlers，
+      我们不应再叠加，避免重复输出/文件句柄膨胀。
+    - 非 pytest 场景：提供一个最小可用的 root 配置，便于本地脚本/工具运行时排障。
     """
-    # 创建日志目录
+    global _ROOT_CONFIGURED
+    if _ROOT_CONFIGURED:
+        return
+
+    root = logging.getLogger()
+    if root.handlers:
+        _ROOT_CONFIGURED = True
+        return
+
     log_dir = Path("reports")
     log_dir.mkdir(exist_ok=True)
     
-    # 创建日志记录器
-    logger = logging.getLogger(name)
-    
-    # 避免重复添加处理器
-    if logger.handlers:
-        return logger
-    
-    logger.setLevel(logging.DEBUG)
-    
-    # 创建格式化器
-    formatter = logging.Formatter(
-        '%(asctime)s [%(levelname)8s] %(name)s: %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+    fmt = logging.Formatter(
+        "%(asctime)s [%(levelname)8s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
+
+    root.setLevel(logging.DEBUG)
     
-    # 控制台处理器
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
-    
-    # 文件处理器
+    # console
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    ch.setFormatter(fmt)
+    root.addHandler(ch)
+
+    # file (non-pytest fallback)
     log_file = log_dir / f"test_{datetime.now().strftime('%Y%m%d')}.log"
-    file_handler = logging.FileHandler(log_file, encoding='utf-8')
-    file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-    
+    fh = logging.FileHandler(log_file, encoding="utf-8")
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(fmt)
+    root.addHandler(fh)
+
+    _ROOT_CONFIGURED = True
+
+
+def get_logger(name: str = __name__) -> logging.Logger:
+    """
+    获取 logger（不在每个 logger 上重复加 handler，统一走 root）。
+    """
+    _ensure_root_logging_configured()
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)
+    # 确保向 root 传播（默认 True，但显式设定更稳）
+    logger.propagate = True
     return logger
 
 

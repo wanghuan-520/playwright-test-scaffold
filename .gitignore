@@ -36,9 +36,15 @@ ENV/
 *.swo
 *~
 
-# Test Reports
+# Cursor AI (may contain credentials, auth tokens, private artifacts)
+.cursor/*
+!.cursor/commands/
+
+# Test Reports (统一忽略所有 allure 相关文件夹)
 allure-results/
+allure-results-*/
 allure-report/
+allure-report-*/
 reports/
 screenshots/
 *.html

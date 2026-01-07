@@ -1,7 +1,0 @@
-HTTP/1.1 307 Temporary Redirect
-location: /auth/set-tenant
-Date: Wed, 24 Dec 2025 06:07:24 GMT
-Connection: keep-alive
-Keep-Alive: timeout=5
-Transfer-Encoding: chunked
-
