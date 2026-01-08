@@ -91,3 +91,8 @@ temp/
 *.backup
 *.backup.*
 
+# Coverage reports
+.coverage
+htmlcov/
+coverage.xml
+

@@ -1,0 +1,126 @@
+# ═══════════════════════════════════════════════════════════════
+# Playwright Test Scaffold - Project Configuration
+# ═══════════════════════════════════════════════════════════════
+
+[project]
+name = "playwright-test-scaffold"
+version = "1.0.0"
+description = "AI-driven Playwright test automation framework"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [
+    {name = "Test Team"}
+]
+keywords = ["playwright", "testing", "automation", "ai"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: Pytest",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development :: Testing",
+]
+
+# ─────────────────────────────────────────────────────────────────
+# Ruff Configuration (Linter + Formatter)
+# ─────────────────────────────────────────────────────────────────
+[tool.ruff]
+target-version = "py39"
+line-length = 120
+exclude = [
+    ".venv",
+    "__pycache__",
+    ".git",
+    "allure-results",
+    "allure-report",
+    "screenshots",
+    "reports",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # do not perform function calls in argument defaults
+    "B905",   # zip without explicit strict
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["core", "pages", "utils", "generators"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+
+# ─────────────────────────────────────────────────────────────────
+# Pytest Configuration
+# ─────────────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+markers = [
+    "smoke: Smoke tests",
+    "e2e: End-to-end tests",
+    "example: Example tests",
+    "P0: Critical priority",
+    "P1: High priority",
+    "P2: Medium priority",
+    "functional: Functional tests",
+    "security: Security tests",
+    "validation: Validation tests",
+    "ui: UI tests",
+]
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--tb=short",
+]
+
+# ─────────────────────────────────────────────────────────────────
+# Coverage Configuration
+# ─────────────────────────────────────────────────────────────────
+[tool.coverage.run]
+source = ["core", "utils", "generators"]
+omit = [
+    "*/__pycache__/*",
+    "*/tests/*",
+    "*/.venv/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]
+show_missing = true
+fail_under = 50
+
+# ─────────────────────────────────────────────────────────────────
+# MyPy Configuration
+# ─────────────────────────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_ignores = true
+ignore_missing_imports = true
+exclude = [
+    ".venv",
+    "__pycache__",
+]
+

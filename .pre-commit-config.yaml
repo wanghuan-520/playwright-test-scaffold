@@ -1,0 +1,56 @@
+# ═══════════════════════════════════════════════════════════════
+# Pre-commit Hooks Configuration
+# ═══════════════════════════════════════════════════════════════
+# 安装：pip install pre-commit && pre-commit install
+# 手动运行：pre-commit run --all-files
+
+repos:
+  # ─────────────────────────────────────────────────────────────────
+  # 基础检查
+  # ─────────────────────────────────────────────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace        # 移除行尾空格
+      - id: end-of-file-fixer          # 确保文件以换行结尾
+      - id: check-yaml                 # 验证 YAML 语法
+      - id: check-json                 # 验证 JSON 语法
+      - id: check-added-large-files    # 阻止大文件提交
+        args: ['--maxkb=500']
+      - id: check-merge-conflict       # 检查合并冲突标记
+      - id: debug-statements           # 检查 debugger/pdb 语句
+
+  # ─────────────────────────────────────────────────────────────────
+  # Python 代码质量
+  # ─────────────────────────────────────────────────────────────────
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.9
+    hooks:
+      - id: ruff                       # Linter
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format               # Formatter
+
+  # ─────────────────────────────────────────────────────────────────
+  # 安全检查
+  # ─────────────────────────────────────────────────────────────────
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets            # 检测敏感信息
+        args: ['--baseline', '.secrets.baseline']
+        exclude: |
+          (?x)^(
+            .*\.lock|
+            .*\.example|
+            test-data/.*\.json\.example
+          )$
+
+# ─────────────────────────────────────────────────────────────────
+# 配置说明
+# ─────────────────────────────────────────────────────────────────
+# 跳过某个 hook：
+#   SKIP=ruff git commit -m "message"
+#
+# 跳过所有 hooks：
+#   git commit -m "message" --no-verify
+
