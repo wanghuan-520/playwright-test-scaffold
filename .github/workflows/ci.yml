@@ -8,9 +8,9 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, vibe-researching]
   pull_request:
-    branches: [main, develop]
+    branches: [main, vibe-researching]
   workflow_dispatch:  # 手动触发
 
 env:

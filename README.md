@@ -397,7 +397,7 @@ docs(readme): 更新文档
 | [框架讲解](docs/framework_overview.md) | 框架整体说明 |
 | [架构设计](docs/architecture.md) | 架构说明、设计模式 |
 | [Spec-Kit 指南](docs/spec-kit-guide.md) | Spec-Driven Development |
-| [宪法解读](docs/constitution-deep-dive.md) | 项目核心原则 |
+| [项目宪法](.specify/memory/constitution.md) | 项目核心原则与标准 |
 
 ---
 
