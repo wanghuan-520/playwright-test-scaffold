@@ -74,6 +74,9 @@ analysis/
 .allure-cache/
 .pytest_cache/
 
+# MCP servers workflow directories (use .specify/ instead)
+.spec-workflow/
+
 # Temporary
 tmp/
 temp/
