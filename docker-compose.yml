@@ -1,0 +1,73 @@
+# ═══════════════════════════════════════════════════════════════
+# Playwright Test Scaffold - Docker Compose
+# ═══════════════════════════════════════════════════════════════
+# 使用方式：
+#   docker-compose up test-unit      # 运行单元测试
+#   docker-compose up test-e2e       # 运行 E2E 测试（需要服务）
+#   docker-compose run --rm shell    # 进入交互式 shell
+
+version: '3.8'
+
+services:
+  # ─────────────────────────────────────────────────────────────────
+  # 单元测试（不需要外部服务）
+  # ─────────────────────────────────────────────────────────────────
+  test-unit:
+    build: .
+    container_name: playwright-test-unit
+    environment:
+      - PRECHECK_SERVICES=0
+    command: pytest tests/framework/ -v --tb=short
+    volumes:
+      - ./allure-results:/app/allure-results
+      - ./reports:/app/reports
+
+  # ─────────────────────────────────────────────────────────────────
+  # 单元测试 + 覆盖率
+  # ─────────────────────────────────────────────────────────────────
+  test-cov:
+    build: .
+    container_name: playwright-test-cov
+    environment:
+      - PRECHECK_SERVICES=0
+    command: >
+      pytest tests/framework/ -v
+      --cov=core --cov=utils
+      --cov-report=term-missing
+      --cov-report=html:/app/reports/coverage
+    volumes:
+      - ./reports:/app/reports
+
+  # ─────────────────────────────────────────────────────────────────
+  # E2E 测试（需要外部服务）
+  # ─────────────────────────────────────────────────────────────────
+  test-e2e:
+    build: .
+    container_name: playwright-test-e2e
+    environment:
+      - PRECHECK_SERVICES=0
+    command: pytest tests/ -v --tb=short -m "not example"
+    volumes:
+      - ./allure-results:/app/allure-results
+      - ./screenshots:/app/screenshots
+      - ./reports:/app/reports
+      - ./config:/app/config:ro
+      - ./test-data:/app/test-data:ro
+    # 如果需要连接到宿主机服务
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # ─────────────────────────────────────────────────────────────────
+  # 交互式 Shell（调试用）
+  # ─────────────────────────────────────────────────────────────────
+  shell:
+    build: .
+    container_name: playwright-shell
+    environment:
+      - PRECHECK_SERVICES=0
+    command: /bin/bash
+    stdin_open: true
+    tty: true
+    volumes:
+      - .:/app
+

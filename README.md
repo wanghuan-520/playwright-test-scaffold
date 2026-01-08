@@ -2,9 +2,15 @@
 
 > **AI 驱动的 Playwright 自动化测试框架** - 用自然语言生成测试，全自动执行
 
+<!-- 徽章区域 -->
+[![CI](https://github.com/wanghuan-520/playwright-test-scaffold/actions/workflows/ci.yml/badge.svg)](https://github.com/wanghuan-520/playwright-test-scaffold/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
-[![Playwright](https://img.shields.io/badge/Playwright-1.49+-green.svg)](https://playwright.dev/)
+[![Playwright](https://img.shields.io/badge/Playwright-1.49-green.svg)](https://playwright.dev/)
+[![pytest](https://img.shields.io/badge/pytest-7.4-orange.svg)](https://pytest.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-purple.svg)](https://github.com/astral-sh/ruff)
+[![Pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://pre-commit.com/)
+[![Docker](https://img.shields.io/badge/Docker-ready-blue?logo=docker)](Dockerfile)
 
 ---
 
@@ -130,6 +136,40 @@ make report
 
 # 打开报告
 make serve
+```
+
+### 5. Docker 方式运行（可选）
+
+```bash
+# 运行单元测试
+docker-compose up test-unit
+
+# 运行测试并生成覆盖率报告
+docker-compose up test-cov
+
+# 进入交互式 Shell
+docker-compose run --rm shell
+```
+
+---
+
+## 🛠️ 开发工具
+
+```bash
+# 安装 pre-commit hooks
+make install-hooks
+
+# 代码检查
+make lint
+
+# 代码格式化
+make format
+
+# 运行框架单元测试
+make test-unit
+
+# 运行单元测试 + 覆盖率
+make test-cov
 ```
 
 ---
