@@ -1,9 +1,0 @@
-url: https://localhost:3000/Abp/Languages/Switch
-final_url: https://localhost:3000/Abp/Languages/Switch
-title: Aevatar Station
-login_required_suspect: false
-
-controls:
-  - heading: 404
-  - heading: This page could not be found.
-  - button: Open Next.js Dev Tools
