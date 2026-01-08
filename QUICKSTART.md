@@ -1,63 +1,104 @@
-# 快速开始：3 步生成测试
+# 🚀 快速开始
 
-**I'm HyperEcho, 在共振着极简主义的频率** 🌌
+**3 步生成测试，5 分钟上手！**
 
 ---
 
-## ⚡ 最简单的方式（推荐）
+## ⚡ 最简单的方式
 
-### 只需要一句话！
+### 在 Cursor 中输入一句话：
+
+```
+@ui-test-plan-generator.mdc @ui-automation-code-generator.mdc 
+
+帮我测试这个页面：<你的页面URL>
+账号：<测试账号>
+密码：<测试密码>
+```
+
+### 等待 AI 完成后：
+
+```bash
+make test TEST_TARGET=tests/<你的模块>
+make report && make serve
+```
+
+**就这么简单！** 🎉
+
+---
+
+## 📋 详细步骤
+
+### 步骤 1：环境准备
+
+```bash
+# 创建虚拟环境
+python3 -m venv venv
+source venv/bin/activate
+
+# 安装依赖
+pip install -r requirements.txt
+playwright install chromium
+
+# 安装 Allure
+brew install allure  # Mac
+```
+
+### 步骤 2：配置项目
+
+```bash
+# 复制配置模板
+cp config/project.yaml.example config/project.yaml
+cp test-data/test_account_pool.json.example test-data/test_account_pool.json
+```
+
+编辑 `config/project.yaml`：
+
+```yaml
+project:
+  name: "Your Project Name"
+
+environments:
+  default: "dev"
+  dev:
+    frontend:
+      url: "https://localhost:3000"  # 改成你的前端地址
+```
+
+编辑 `test-data/test_account_pool.json`：
+
+```json
+{
+  "test_account_pool": [
+    {
+      "username": "your_test_user",
+      "email": "test@example.com",
+      "password": "YourPassword123!",
+      "initial_password": "YourPassword123!",
+      "in_use": false,
+      "is_locked": false
+    }
+  ]
+}
+```
+
+### 步骤 3：生成测试
 
 在 Cursor 中输入：
 
 ```
 @ui-test-plan-generator.mdc @ui-automation-code-generator.mdc 
 
-帮我测试这个页面：https://localhost:3000/admin/users
-账号：admin-test01@test.com
-密码：Wh520520!
+帮我测试这个页面：https://your-site.com/login
+账号：test@example.com
+密码：YourPassword123!
 ```
 
-等待 10-15 分钟，然后：
-
-```bash
-make test TEST_TARGET=tests/admin/users
-make report && make serve
-```
-
-**就这么简单！** 🚀
-
----
-
-## 📋 完整步骤
-
-### 步骤 1：在 Cursor 中输入
-
-复制下面的模板，修改 URL、账号、密码：
-
-```
-@ui-test-plan-generator.mdc @ui-automation-code-generator.mdc 
-
-帮我测试这个页面：<改成你的URL>
-账号：<改成你的账号>
-密码：<改成你的密码>
-```
-
-### 步骤 2：等待 AI 完成
-
-AI 会自动：
-1. ✅ 打开浏览器探索页面
-2. ✅ 生成功能规约和测试计划
-3. ✅ 生成完整的测试代码
-4. ✅ 生成测试数据
-
-大约需要 10-15 分钟。
-
-### 步骤 3：运行测试
+### 步骤 4：运行测试
 
 ```bash
 # 运行测试
-make test TEST_TARGET=tests/admin/users
+make test TEST_TARGET=tests/login
 
 # 生成报告
 make report
@@ -69,58 +110,31 @@ make serve
 
 ---
 
-## 🎯 示例
+## 🎯 常用命令
 
-### 测试用户管理页面
+```bash
+# 运行所有测试
+make test
 
-```
-@ui-test-plan-generator.mdc @ui-automation-code-generator.mdc 
+# 运行指定目录
+make test TEST_TARGET=tests/login
 
-帮我测试这个页面：https://localhost:3000/admin/users
-账号：admin-test01@test.com
-密码：Wh520520!
-```
+# 只运行 P0 测试
+make test-p0
 
-### 测试系统设置页面
+# 清理测试结果
+make clean
 
-```
-@ui-test-plan-generator.mdc @ui-automation-code-generator.mdc 
-
-帮我测试这个页面：https://localhost:3000/admin/settings
-账号：admin-test02@test.com
-密码：Wh520520!
-```
-
-### 测试个人资料页面
-
-```
-@ui-test-plan-generator.mdc @ui-automation-code-generator.mdc 
-
-帮我测试这个页面：https://localhost:3000/admin/profile
-账号：admin-test03@test.com
-密码：Wh520520!
+# 生成并查看报告
+make serve
 ```
 
 ---
 
-## 💡 提示
-
-### 使用 Admin 账号
-
-项目已配置了 10 个 admin 账号，密码都是 `Wh520520!`：
-- admin-test01@test.com
-- admin-test02@test.com
-- ...
-- admin-test10@test.com
-
-详见：`docs/account-pool-management.md`
-
-### 查看生成的文件
-
-完成后，你会得到：
+## 📁 生成的文件
 
 ```
-specs/###-slug/
+specs/<feature>/
 ├── spec.md          # 功能规约
 ├── plan.md          # 技术计划
 └── tasks.md         # 任务清单
@@ -128,9 +142,9 @@ specs/###-slug/
 pages/
 └── xxx_page.py      # 页面对象
 
-tests/xxx/
-├── test_xxx_p0.py   # P0 测试
-├── test_xxx_p1.py   # P1 测试
+tests/<feature>/
+├── test_xxx_p0.py   # P0 核心测试
+├── test_xxx_p1.py   # P1 重要测试
 └── test_xxx_security.py  # 安全测试
 
 test-data/
@@ -139,58 +153,54 @@ test-data/
 
 ---
 
-## 📚 更多文档
+## 💡 提示
 
-### 想要更详细的说明？
+### 账号池管理
 
-- **[快速模板](docs/quick-templates.md)** ⚡ - 多种模板可选
-- **[完整流程](docs/unknown-page-complete-workflow.md)** ⭐ - 分阶段详细说明
-- **[工作流对比](docs/workflow-comparison.md)** - 已知 vs 未知页面
+框架会自动管理测试账号：
+- 每个测试用例分配独立账号
+- 测试后自动释放
+- 支持并行执行
 
-### 想要学习原理？
+建议准备 **5-10 个测试账号**。
 
-- **[Spec-Kit 指南](docs/spec-kit-guide.md)** - 框架详解
-- **[宪法深度解读](docs/constitution-deep-dive.md)** - 设计哲学
-- **[架构文档](docs/architecture.md)** - 项目结构
+### 修改生成的代码
+
+生成的代码可能需要微调：
+- ✅ 选择器可能需要调整
+- ✅ 断言可能需要补充
+- ✅ 测试数据可能需要完善
+
+### 查看更多文档
+
+- [框架概览](docs/framework_overview.md)
+- [架构文档](docs/architecture.md)
+- [Spec-Kit 指南](docs/spec-kit-guide.md)
 
 ---
 
 ## 🚨 常见问题
 
-### Q: 如果生成失败了怎么办？
+### Q: 测试失败怎么办？
 
-**方案 1**：检查错误信息，修改参数后重试
+1. 查看 Allure 报告中的截图
+2. 检查选择器是否正确
+3. 检查测试账号是否可用
 
-**方案 2**：使用分阶段方式（参考 `docs/unknown-page-complete-workflow.md`）
+### Q: 如何添加更多账号？
 
-### Q: 生成的代码需要修改吗？
+编辑 `test-data/test_account_pool.json`，添加新账号。
 
-**通常只需要微调**：
-- ✅ 定位器可能需要调整
-- ✅ 断言可能需要补充
-- ✅ 测试数据可能需要完善
+### Q: 如何调试测试？
 
-### Q: 如何测试多个页面？
+```bash
+# 有头模式运行
+HEADLESS=false pytest tests/login -v
 
-**连续执行**：
-```
-1. 第 1 个页面 → 复制模板 → 修改 URL → 执行
-2. 第 2 个页面 → 复制模板 → 修改 URL → 执行
-3. 第 3 个页面 → 复制模板 → 修改 URL → 执行
+# 使用 Playwright Inspector
+PWDEBUG=1 pytest tests/login -v
 ```
 
 ---
 
-**I'm HyperEcho, 在极简实战的共振中完成** 🌌
-
-哥，这就是**最简单的方式**！
-
-**只需要记住**：
-1. 复制模板
-2. 改 URL/账号/密码
-3. 粘贴到 Cursor
-4. 等待完成
-5. 运行测试
-
-**就这么简单！** 🚀
-
+**Happy Testing! 🎭**
