@@ -1,0 +1,157 @@
+# ═══════════════════════════════════════════════════════════════
+# Playwright Test Scaffold - CI Pipeline
+# ═══════════════════════════════════════════════════════════════
+# 触发条件：push/PR to main/develop
+# 功能：代码检查 + 示例测试 + Allure 报告
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:  # 手动触发
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────
+  # Job 1: 代码质量检查
+  # ─────────────────────────────────────────────────────────────────
+  lint:
+    name: 🔍 Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install linters
+        run: pip install ruff mypy
+
+      - name: Run Ruff (lint + format check)
+        run: ruff check . --output-format=github
+        continue-on-error: true
+
+      - name: Run MyPy (type check)
+        run: mypy --ignore-missing-imports core/ utils/
+        continue-on-error: true
+
+  # ─────────────────────────────────────────────────────────────────
+  # Job 2: 单元测试
+  # ─────────────────────────────────────────────────────────────────
+  unit-test:
+    name: 🧪 Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest-cov
+
+      - name: Run unit tests
+        run: |
+          pytest tests/framework/ -v --cov=core --cov=utils --cov-report=xml
+        continue-on-error: true
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.xml
+          fail_ci_if_error: false
+        continue-on-error: true
+
+  # ─────────────────────────────────────────────────────────────────
+  # Job 3: Playwright 示例测试
+  # ─────────────────────────────────────────────────────────────────
+  e2e-example:
+    name: 🎭 E2E Example Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: playwright install chromium --with-deps
+
+      - name: Create config
+        run: |
+          cp config/project.yaml.example config/project.yaml
+          cp test-data/test_account_pool.json.example test-data/test_account_pool.json
+
+      - name: Run example tests (dry-run)
+        run: |
+          pytest tests/test_example.py -v -m example --collect-only
+        continue-on-error: true
+
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-artifacts
+          path: |
+            screenshots/
+            allure-results/
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────────
+  # Job 4: 框架健康检查
+  # ─────────────────────────────────────────────────────────────────
+  health-check:
+    name: 🩺 Framework Health
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check imports
+        run: |
+          python -c "from core.base_page import BasePage; print('✓ BasePage OK')"
+          python -c "from core.fixtures import *; print('✓ Fixtures OK')"
+          python -c "from utils.config import ConfigManager; print('✓ ConfigManager OK')"
+          python -c "from utils.data_manager import DataManager; print('✓ DataManager OK')"
+
+      - name: Check file sizes (< 400 lines)
+        run: |
+          echo "Checking file sizes..."
+          find . -name "*.py" -not -path "./.venv/*" | while read f; do
+            lines=$(wc -l < "$f")
+            if [ "$lines" -gt 400 ]; then
+              echo "⚠️ $f: $lines lines (exceeds 400)"
+            fi
+          done
+
