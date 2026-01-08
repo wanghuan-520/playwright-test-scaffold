@@ -29,8 +29,8 @@
 - 本规则只做 Step1 文档与证据链；**不要修改账号池内容**（账号池由 fixture 在执行期管理）。
 
 ## 需求对齐（必须）
-- 生成测试计划必须对齐项目需求：`docs/requirements/requirements.md`
-  - Aevatar：**输入校验以 ABP 后端为真理源**
+- 生成测试计划必须对齐项目需求文档（如有）
+- 输入校验规则来源优先级：**后端 API/DTO 定义 > 前端校验代码 > 页面观测**
 
 ## 规则补全（必须）
 - 校验/边界/一致性：对齐 `.cursor/rules/quality/test-case-standards.mdc`
@@ -52,42 +52,35 @@
 - 输出失败原因
 - 请求用户提供：storageState/cookie 或 MCP 导出的 PageInfo/HTML/截图（桥接模式）
 
-### 1.2) 规则快照（条件触发：ABP/Swagger 优先；否则走代码识别/计划降级）
+### 1.2) 规则快照（条件触发：Swagger/OpenAPI 优先；否则走代码识别/计划降级）
 
-> 目的：当项目**确实存在可获取的后端规则**时，优先把规则“落盘为证据”，避免阈值凭空猜测；  
-> 但**不是所有项目都是 ABP**，因此本步骤必须是“条件触发”，而不是全局硬前提。
+> 目的：当项目**确实存在可获取的后端规则**时，优先把规则"落盘为证据"，避免阈值凭空猜测；  
+> 本步骤是"条件触发"，而不是全局硬前提。
 
 #### 触发条件（满足任一即可执行快照采集）
-- 需求明确：`docs/requirements/requirements.md` 指定“输入校验以 ABP 后端为真理源”
-- 运行时探测：`GET <frontend_base>/api/abp/application-configuration` 返回 200（或返回 JSON 且包含 `settings.values`）
 - 运行时探测：存在可访问 OpenAPI/Swagger（例如 `GET <backend_base>/swagger/v1/swagger.json` 返回 200）
+- 运行时探测：后端提供 API 配置端点（如 `/api/app/config` 等）返回 200 且包含验证规则
 
 #### 若触发：采集并落盘（推荐，但仅在触发时要求）
-- `docs/test-plans/artifacts/<slug>/abp_app_config.json`
-  - 来源：`GET <frontend_base>/api/abp/application-configuration`
-  - 用途：提取 **PasswordPolicy**（RequiredLength / RequireDigit / RequireUppercase / RequireLowercase / RequireNonAlphanumeric / RequiredUniqueChars 等）
-- `docs/test-plans/artifacts/<slug>/abp_swagger.json`
+- `docs/test-plans/artifacts/<slug>/swagger.json`
   - 来源（择一可用）：
     - `GET <backend_base>/swagger/v1/swagger.json`
     - `GET <frontend_base>/swagger/v1/swagger.json`
-  - 用途：提取 DTO 约束（required/minLength/maxLength/pattern），作为输入校验矩阵的“真理源”
-- `docs/test-plans/artifacts/<slug>/backend_swagger.json`（强烈建议：更权威、更少重定向问题）
-  - 来源：`GET <backend_base>/swagger/v1/swagger.json`
-  - 说明：前端域名下的 swagger 可能被租户/登录流程重定向；优先抓后端直连
-- `docs/test-plans/artifacts/<slug>/abp_rules_extract.json`
-  - 内容：从上述 JSON 解析出的“规则摘要”（仅结构化规则，不包含任何用户输入/密码）
+  - 用途：提取 DTO 约束（required/minLength/maxLength/pattern），作为输入校验矩阵的"真理源"
+- `docs/test-plans/artifacts/<slug>/rules_extract.json`
+  - 内容：从上述 JSON 解析出的"规则摘要"（仅结构化规则，不包含任何用户输入/密码）
 
 #### 若不触发 / 采集失败：降级策略（必须写进计划，避免硬猜）
-- **优先降级到“代码识别”**（仅当仓库可读时）：
-  - 后端：搜索 DTO/校验（minLength/maxLength/regex/required；或 ABP 的 PasswordOptions/IdentityOptions）
+- **优先降级到"代码识别"**（仅当仓库可读时）：
+  - 后端：搜索 DTO/校验（minLength/maxLength/regex/required）
   - 前端：搜索表单校验（schema/validator/regex/提示文案来源）
-  - 将推导出的规则以“推导证据 + 文件路径/片段”写入计划（仍需脱敏，禁止包含密码）
+  - 将推导出的规则以"推导证据 + 文件路径/片段"写入计划（仍需脱敏，禁止包含密码）
 - 若代码也无法识别：在计划中标注 `TBD(无法获得真理源：快照失败 + 代码不可读)`，并说明原因（401/403/404/网络/权限）。
 - **禁止硬猜阈值**：没有快照/代码证据就不写死 requiredLength/maxLength/regex。
 
-### 1.3) 前后端代码识别（条件触发：非 ABP / 规则不足以补全用例时）
+### 1.3) 前后端代码识别（条件触发：无 Swagger / 规则不足以补全用例时）
 
-> 目的：当项目不是 ABP（或无法抓取规则快照），但“补全用例”又需要更可靠的约束来源时，  
+> 目的：当项目无法抓取规则快照，但"补全用例"又需要更可靠的约束来源时，  
 > 通过识别前后端代码，抽取**可证据化**的输入限制/业务校验/错误体结构，减少 TBD。
 
 #### 仓库位置来源（强制：单一真相源）
@@ -103,7 +96,7 @@
   - 按 1.2 的降级策略在计划中保留 `TBD(代码识别失败)`，**禁止硬猜阈值**
 
 触发条件（满足任一即可执行）：
-- 1.2 未触发（项目非 ABP / 无 swagger / 无法访问后端规则）
+- 1.2 未触发（无 Swagger / 无法访问后端规则）
 - 计划中的关键阈值/规则仍为 `TBD`，且会影响 P1 矩阵/边界用例的可运行性
 - 页面证据链不足以解释校验来源（例如：提示文案来自后端错误体、或前端 schema）
 

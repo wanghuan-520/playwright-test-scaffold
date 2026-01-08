@@ -70,19 +70,19 @@ po.fill_password(payload)  # 只有 password 是恶意 payload
 
 ---
 
-## ✅ 强制：以前端可观测行为做断言，但以后端 ABP 为真理校准规则（前后端一致性）
+## ✅ 强制：以前端可观测行为做断言，但以后端为真理校准规则（前后端一致性）
 
-目标：**不允许出现“前端放行 → 调后端才报错”的体验缺陷**。
+目标：**不允许出现"前端放行 → 调后端才报错"的体验缺陷**。
 
 ### 规则（必须）
-- **后端 ABP 规则是真理来源**：required/maxLength/pattern/minLength 等以 ABP DTO/OpenAPI 为准。
-- **前端断言是第一优先**：所有校验相关用例，最终必须验证到“用户可见的前端表现”（错误提示/字段 invalid/按钮不可提交）。
-- **一致性断言必须补上**（关键）：对“应被拒绝”的输入：
-  - **前端必须拦截住**：断言“不会发出提交 API”（例如 `PUT /api/account/my-profile` 不应发生）
-  - **后端 ABP 必须同样拒绝**：同一输入用 API 方式直连（带登录态 cookie/session），断言 4xx + 可诊断错误体（body/validationErrors）
+- **后端规则是真理来源**：required/maxLength/pattern/minLength 等以后端 DTO/OpenAPI 为准。
+- **前端断言是第一优先**：所有校验相关用例，最终必须验证到"用户可见的前端表现"（错误提示/字段 invalid/按钮不可提交）。
+- **一致性断言必须补上**（关键）：对"应被拒绝"的输入：
+  - **前端必须拦截住**：断言"不会发出提交 API"（例如 `PUT /api/xxx` 不应发生）
+  - **后端必须同样拒绝**：同一输入用 API 方式直连（带登录态 cookie/session），断言 4xx + 可诊断错误体（body/validationErrors）
 
 ### 实践建议（强烈建议）
-- **规则快照**：每个页面至少 1 条 `*_abp_rules_snapshot` 用例，把 OpenAPI/Swagger 抽取出的字段规则挂到 Allure 附件（审计/对齐/排查 drift 用）。
+- **规则快照**：每个页面至少 1 条 `*_rules_snapshot` 用例，把 OpenAPI/Swagger 抽取出的字段规则挂到 Allure 附件（审计/对齐/排查 drift 用）。
 
 ---
 
@@ -140,7 +140,7 @@ tests/
   → 此类用例优先断言“不会触发提交 API”，不要强绑错误文案（跨 OS/浏览器不稳定）
 
 ### 后端规则来源（至少一种，默认必须读）
-- ABP DTO/Attribute：`[Required]` / `[StringLength]` / `[EmailAddress]` 等
+- DTO/Model 定义：`[Required]` / `[StringLength]` / `[EmailAddress]` 等校验属性
 - OpenAPI/SDK：`src/client/types.gen.ts` / `src/client/sdk.gen.ts` 的 DTO 与接口定义
 
 ### Security（必须按字段维度）
@@ -154,7 +154,7 @@ tests/
 
 **问题**：安全测试容易陷入"payload 堆积"陷阱（8个payload × 3字段 = 24条用例），但实际上：
 - 如果前端做了统一转义/校验，所有 XSS payload 会有相同结果
-- 如果后端用了参数化查询（ABP 默认），所有 SQLi payload 会有相同结果
+- 如果后端用了参数化查询，所有 SQLi payload 会有相同结果
 - 冗余的 payload 只增加执行时间，不增加覆盖率
 
 **精简方案**（5个代表性 payload，覆盖核心攻击向量）：
@@ -279,7 +279,7 @@ except Exception:
 ## 🔐 Security 用例基线（当用户要求安全测试时，必须覆盖）
 
 ### 鉴权/会话（必须）
-- ✅ **未登录访问受保护页面**：应被重定向到登录流程（如 `/auth/login` 或后端 `/Account/Login`）
+- ✅ **未登录访问受保护页面**：应被重定向到登录流程（如 `/login` 或 `/auth/login`）
 - ✅ **logout 后访问受保护页面**：应再次进入登录流程（防止会话残留）
 
 ### 注入/脚本（必须）

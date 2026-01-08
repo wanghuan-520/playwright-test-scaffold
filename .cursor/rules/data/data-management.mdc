@@ -21,7 +21,7 @@ PRECHECK_ACCOUNTS=1 REUSE_LOGIN=1 make test TEST_TARGET=tests/admin/profile PYTE
 
 ## 🔐 登录态复用（强烈推荐）
 
-当用例数量较多（尤其 P1/P2/security）时，反复走 OIDC→ABP `/Account/Login` 容易触发后端 **lockout**。
+当用例数量较多（尤其 P1/P2/security）时，反复走登录流程容易触发后端 **lockout**（账号锁定）。
 
 **推荐做法**：使用 session 级登录态缓存（Playwright `storage_state`）
 - ✅ session 级先登录一次并导出 `.auth/storage_state.json`
