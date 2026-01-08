@@ -16,14 +16,14 @@
 
 ## ✨ 核心特性
 
-### 🤖 AI 驱动的全自动化测试
+### 🤖 AI 驱动的测试生成
 
 ```
-用户："帮我测试登录页面"
+步骤 1：在 Cursor 中 @ 规则文件，提供 URL 和登录信息
   ↓
-AI 自动完成：页面分析 → 代码生成 → 测试执行 → 报告打开
+AI 自动完成：页面分析 → 测试计划 → 代码生成
   ↓
-无需任何手动操作！✨
+步骤 2：执行测试脚本，生成 Allure 报告
 ```
 
 ### 🔍 双重分析保证准确性
@@ -235,29 +235,29 @@ playwright-test-scaffold/
 
 ## 🧭 使用流程
 
-### 方式一：与 AI 对话（推荐）
-
-在 Cursor 中直接对话：
+### 步骤 1：生成测试代码（在 Cursor 中）
 
 ```
-用户："帮我测试登录页面"
+@ui-test-plan-generator.mdc @ui-automation-code-generator.mdc
+
+帮我测试这个页面：https://your-site.com/login
+账号：test@example.com
+密码：YourPassword123!
 ```
 
 AI 将自动完成：
-1. 页面分析与代码生成
-2. 自动测试执行
-3. 报告生成与展示
+- 📋 页面分析与测试计划生成
+- 🧩 Page Object 代码生成
+- ✅ 测试用例代码生成
+- 📦 测试数据文件生成
 
-### 方式二：手动执行
+### 步骤 2：执行测试并生成报告
 
 ```bash
-# 1) 运行测试
-make test TEST_TARGET=tests/
+# 运行测试
+make test TEST_TARGET=tests/<你的模块>
 
-# 2) 生成报告
-make report
-
-# 3) 打开报告
+# 生成并打开报告
 make serve
 ```
 
