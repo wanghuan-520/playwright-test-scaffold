@@ -254,10 +254,10 @@ AI 将自动完成：
 ### 步骤 2：执行测试并生成报告
 
 ```bash
-# 运行测试
-make test TEST_TARGET=tests/<你的模块>
+# 使用 4 个 worker 并行执行测试
+pytest tests/<你的模块> -n 4 --alluredir=allure-results
 
-# 生成并打开报告
+# 生成并打开 Allure 报告
 make serve
 ```
 
