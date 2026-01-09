@@ -96,3 +96,5 @@ temp/
 htmlcov/
 coverage.xml
 
+prototypes/*/node_modules/
+prototypes/*/.next/
