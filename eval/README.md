@@ -1,174 +1,216 @@
-# Eval 框架 - 纯规则快速验证
+# Eval 框架 - AI 输出质量评估
 
-> 不需要 LLM，完全基于规则检查，免费且快速
+适用于 **Vibe Research** 等 AI 研究系统的输出质量评估框架。
+
+## 核心特性
+
+| 功能 | 说明 | 成本 |
+|-----|------|------|
+| **规则检查** | 结构、内容、质量 10 项快速检查 | 免费 |
+| **LLM 评估** | 逻辑、证据、准确性、完整性、洞察力 5 维深度评估 | 付费 |
+| **理论验证** | 专门验证推理/结论的正确性 | 付费 |
+| **Pipeline** | 规则预检 + LLM 深度评估组合 | 混合 |
 
 ---
 
-## 🚀 快速开始
+## 快速开始
 
-### 最简单的用法（一行代码）
+### 1. 安装依赖
+
+```bash
+pip install openai  # LLM 评估需要
+```
+
+### 2. 配置 API Key
+
+```bash
+# 推荐 DeepSeek（性价比之王）
+export EVAL_LLM_PROVIDER=deepseek
+export DEEPSEEK_API_KEY=sk-your-key
+```
+
+详细配置见 [CONFIG_GUIDE.md](CONFIG_GUIDE.md)
+
+### 3. 使用
 
 ```python
-from eval.rule_evaluator import is_quality_ok
+# 快速检查（免费）
+from eval import is_quality_ok
 
 if is_quality_ok(ai_output):
-    print("质量达标 ✅")
-else:
-    print("质量不达标 ❌")
+    print("基本合格 ✅")
+
+# 完整评估（规则 + LLM）
+from eval import full_eval
+
+result = full_eval(ai_output, context="研究方向")
+print(f"得分: {result['overall_score']}")
 ```
 
-### 获取详细评估结果
+---
+
+## 使用场景
+
+### 场景 1：开发调试（只用规则，免费）
 
 ```python
-from eval.rule_evaluator import quick_eval
+from eval import quick_eval
 
 result = quick_eval(ai_output)
-
-print(f"通过: {result['passed']}")
-print(f"得分: {result['score']}")
-print(f"摘要: {result['summary']}")
-print(f"失败项: {result['failed_checks']}")
+if not result["passed"]:
+    print("问题:", result["failed_checks"])
 ```
 
-### 完整用法
+### 场景 2：CI/CD 测试（规则 + LLM）
 
 ```python
-from eval import RuleEvaluator
+from eval import EvalPipeline
 
-# 创建评估器（可自定义阈值）
-evaluator = RuleEvaluator(threshold=0.7)
+pipeline = EvalPipeline()
+result = pipeline.run(ai_output, context="研究方向")
 
-# 评估
-result = evaluator.evaluate(
-    text=ai_output,
-    context="用户的原始输入"  # 可选
+assert result["overall_passed"], f"Eval 失败: {result}"
+```
+
+### 场景 3：理论正确性验证（Vibe Research 专用）
+
+```python
+from eval import LLMEvaluator
+
+evaluator = LLMEvaluator()
+result = evaluator.evaluate_theory(
+    theory="AI 推导出的结论",
+    premises=["前提条件 1", "前提条件 2"],
+    expected_conclusion="预期结论（可选）"
 )
 
-# 美化打印
-evaluator.print_result(result)
+if result["passed"]:
+    print("推理正确 ✅")
+else:
+    print("推理有问题:", result["suggestions"])
 ```
 
----
-
-## 📊 检查项说明
-
-### 结构检查 (Structure)
-
-| 检查项 | 说明 | 通过条件 |
-|-------|------|---------|
-| `has_titles` | 是否有标题结构 | ≥2 个 # 标题 |
-| `has_sections` | 是否有必要章节 | 包含摘要/引言/结论等 |
-| `paragraph_structure` | 段落结构合理 | 5-50 段，平均 50-500 字 |
-
-### 内容检查 (Content)
-
-| 检查项 | 说明 | 通过条件 |
-|-------|------|---------|
-| `min_length` | 最小长度 | ≥500 字 |
-| `has_evidence` | 有证据支撑 | ≥2 个证据关键词 |
-| `has_data` | 有数据 | ≥1 处数据 |
-| `no_placeholder` | 无占位符 | 无 [TODO] 等 |
-
-### 质量检查 (Quality)
-
-| 检查项 | 说明 | 通过条件 |
-|-------|------|---------|
-| `no_repetition` | 无重复 | 重复率 <10% |
-| `readability` | 可读性 | 平均句长 20-80 字 |
-| `terminology` | 专业术语 | 术语覆盖 ≥20% |
-
----
-
-## 📈 评分规则
-
-- 每项检查得分 0-1
-- 总分 = 所有检查项的平均分
-- 默认通过阈值 = 0.7
-
----
-
-## 🔧 自定义配置
-
-### 修改通过阈值
+### 场景 4：批量评估
 
 ```python
-# 严格模式
-evaluator = RuleEvaluator(threshold=0.8)
+from eval import EvalPipeline
 
-# 宽松模式
-evaluator = RuleEvaluator(threshold=0.6)
-```
+pipeline = EvalPipeline()
+report = pipeline.run_batch([
+    {"text": output1, "context": "问题 1"},
+    {"text": output2, "context": "问题 2"},
+])
 
-### 只运行部分检查
-
-```python
-from eval.checkers import StructureChecker, ContentChecker
-
-# 只检查结构
-structure = StructureChecker()
-results = structure.run_all(text)
-
-# 只检查内容
-content = ContentChecker()
-results = content.run_all(text)
+print(f"通过率: {report['pass_rate']}")
+print(f"平均分: {report['avg_score']}")
+pipeline.save_report(report, "eval_report.json")
 ```
 
 ---
 
-## 📁 文件结构
+## 评估维度
+
+### 规则检查（10 项）
+
+| 类别 | 检查项 | 说明 |
+|-----|--------|------|
+| 结构 | has_titles | 是否有标题层级 |
+| 结构 | has_sections | 是否有必要章节 |
+| 结构 | paragraph_structure | 段落结构是否合理 |
+| 内容 | min_length | 是否达到最小长度 |
+| 内容 | has_evidence | 是否有证据支撑 |
+| 内容 | has_data | 是否有数据 |
+| 内容 | no_placeholder | 是否无占位符 |
+| 质量 | no_repetition | 是否无重复 |
+| 质量 | readability | 可读性是否良好 |
+| 质量 | terminology | 专业术语覆盖 |
+
+### LLM 评估（5 维）
+
+| 维度 | 权重 | 说明 |
+|-----|------|------|
+| **逻辑** (logic) | 25% | 推理链是否严密，论证是否自洽 |
+| **证据** (evidence) | 25% | 结论是否有充分证据支撑 |
+| **准确** (accuracy) | 20% | 陈述的事实是否正确 |
+| **完整** (completeness) | 15% | 是否涵盖关键方面 |
+| **洞察** (insight) | 15% | 是否有深度分析和独到见解 |
+
+---
+
+## 文件结构
 
 ```
 eval/
-├── __init__.py          # 导出接口
-├── checkers.py          # 三类检查器
-├── rule_evaluator.py    # 主评估器
-└── README.md            # 本文件
+├── __init__.py         # 包入口，导出所有公共 API
+├── config.py           # 配置管理（支持多 LLM 提供商）
+├── checkers.py         # 规则检查器实现
+├── rule_evaluator.py   # 纯规则评估器
+├── llm_evaluator.py    # LLM 深度评估器
+├── pipeline.py         # 完整评估流水线
+├── CONFIG_GUIDE.md     # 配置指南
+└── README.md           # 本文档
 ```
 
 ---
 
-## 💡 使用场景
+## 成本估算
 
-1. **CI/CD 集成**：作为质量门禁
-2. **开发自测**：快速验证 AI 输出
-3. **批量筛选**：过滤低质量输出
-4. **预检**：在调用 LLM 评估前先做规则检查
+假设每次评估 2000 tokens：
+
+| 提供商 | 100 次/天 | 月成本 |
+|-------|----------|--------|
+| DeepSeek | ¥0.2 | ¥6 |
+| 智谱 GLM-4-Flash | ¥0.02 | ¥0.6 |
+| OpenAI GPT-4o-mini | ¥2 | ¥60 |
+| Ollama 本地 | 免费 | ¥0 |
 
 ---
 
-## 🎯 与 pytest 集成
+## 集成到 Pytest
 
 ```python
-# tests/test_eval.py
-
+# conftest.py
 import pytest
-from eval import RuleEvaluator
+from eval import EvalPipeline
 
-evaluator = RuleEvaluator(threshold=0.7)
+@pytest.fixture
+def eval_pipeline():
+    return EvalPipeline()
 
-def test_output_quality():
-    ai_output = get_ai_output()
-    result = evaluator.evaluate(ai_output)
+# test_research.py
+def test_ai_output_quality(eval_pipeline, ai_output):
+    result = eval_pipeline.run(ai_output, context="研究方向")
     
-    assert result["passed"], f"质量不达标: {result['failed_checks']}"
-    assert result["score"] >= 0.7, f"得分过低: {result['score']}"
+    assert result["overall_passed"], f"""
+    Eval 失败！
+    得分: {result['overall_score']}
+    规则检查: {result['rule_check']}
+    LLM 评估: {result['llm_eval']}
+    """
 ```
 
 ---
 
-## 📊 输出示例
+## FAQ
 
-```
-==================================================
-评估结果: ✅ 通过
-总分: 0.85 (阈值: 0.7)
-摘要: 通过 8/10 项检查，得分 0.85
-==================================================
+**Q: 不配置 API Key 能用吗？**
 
-❌ 未通过的检查:
-  - has_data: 缺少数据支撑
-  - terminology: 术语覆盖 15%
+A: 可以！只用规则检查：
 
-✅ 通过的检查: has_titles, has_sections, paragraph_structure, min_length, has_evidence, no_placeholder, no_repetition, readability
+```python
+from eval import is_quality_ok
+is_quality_ok(text)  # 不需要 API Key
 ```
 
+**Q: 哪个 LLM 最划算？**
+
+A: DeepSeek，¥0.001/千 tokens，能力接近 GPT-4。
+
+**Q: 本地跑免费吗？**
+
+A: 用 Ollama 完全免费，但需要 GPU：
+
+```bash
+ollama pull qwen2.5:7b
+export EVAL_LLM_PROVIDER=ollama
+```
