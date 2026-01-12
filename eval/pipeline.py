@@ -124,8 +124,9 @@ class EvalPipeline:
                 # 综合评分：规则 30% + LLM 70%
                 combined_score = rule_result["score"] * 0.3 + llm_result["score"] * 0.7
                 result["overall_score"] = round(combined_score, 2)
+                # 使用 round 后的分数进行比较，避免浮点精度问题
                 result["overall_passed"] = (
-                    combined_score >= self.llm_threshold and
+                    result["overall_score"] >= self.llm_threshold and
                     llm_result["score"] >= 0.6  # LLM 评分至少 0.6
                 )
                 

@@ -16,6 +16,15 @@ Eval 框架 - AI 输出质量评估
     from eval import full_eval
     
     result = full_eval(ai_output, context="研究方向")
+
+Pytest 集成：
+    # conftest.py
+    pytest_plugins = ["eval.pytest_plugin"]
+    
+    # test_xxx.py
+    def test_ai_output(eval_pipeline, eval_assert):
+        result = eval_pipeline.run(ai_output)
+        eval_assert.passed(result)
 """
 
 # 纯规则评估（免费）
