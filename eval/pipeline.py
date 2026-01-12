@@ -26,12 +26,12 @@ from .llm_evaluator import LLMEvaluator
 
 class EvalPipeline:
     """
-    完整 Eval 流水线
+    完整 Eval 流水线（全量 LLM 评估）
     
     特点：
-    - 规则预检：快速过滤明显低质量内容
-    - LLM 评估：深度评估理论正确性
-    - 可配置：支持多种 LLM 提供商
+    - 规则预检：辅助检查（30% 权重）
+    - LLM 评估：核心评估（70% 权重），始终执行
+    - 可配置：支持 DeepSeek、智谱、OpenAI、Ollama
     """
     
     def __init__(
@@ -39,7 +39,7 @@ class EvalPipeline:
         config: Optional[EvalConfig] = None,
         rule_threshold: float = 0.6,
         llm_threshold: float = 0.7,
-        skip_llm_on_rule_fail: bool = False,  # 改为 False，即使规则失败也跑 LLM
+        skip_llm_on_rule_fail: bool = False,  # 永远不跳过 LLM
     ):
         """
         初始化 Pipeline
@@ -72,15 +72,15 @@ class EvalPipeline:
         self,
         text: str,
         context: Optional[str] = None,
-        run_llm: bool = True,
+        run_llm: bool = True,  # 默认始终运行 LLM
     ) -> Dict[str, Any]:
         """
-        运行完整评估
+        运行完整评估（全量 LLM）
         
         Args:
             text: 要评估的文本
             context: 上下文（研究方向、原始问题等）
-            run_llm: 是否运行 LLM 评估（关闭可省钱）
+            run_llm: 是否运行 LLM 评估（强烈建议 True）
         
         Returns:
             完整评估结果

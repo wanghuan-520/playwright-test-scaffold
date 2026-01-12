@@ -4,12 +4,12 @@
 
 ## 核心特性
 
-| 功能 | 说明 | 成本 |
-|-----|------|------|
-| **规则检查** | 结构、内容、质量 10 项快速检查 | 免费 |
-| **LLM 评估** | 逻辑、证据、准确性、完整性、洞察力 5 维深度评估 | 付费 |
-| **理论验证** | 专门验证推理/结论的正确性 | 付费 |
-| **Pipeline** | 规则预检 + LLM 深度评估组合 | 混合 |
+| 功能 | 说明 |
+|-----|------|
+| **全量 LLM 评估** | 逻辑、证据、准确性、完整性、洞察力 5 维深度评估 |
+| **理论验证** | 专门验证推理/结论的正确性 |
+| **规则辅助** | 结构、内容、质量 10 项快速检查（30% 权重） |
+| **综合评分** | 规则 30% + LLM 70% = 最终分数 |
 
 ---
 
@@ -49,30 +49,23 @@ print(f"得分: {result['overall_score']}")
 
 ---
 
-## 使用场景
+## 使用方式
 
-### 场景 1：开发调试（只用规则，免费）
-
-```python
-from eval import quick_eval
-
-result = quick_eval(ai_output)
-if not result["passed"]:
-    print("问题:", result["failed_checks"])
-```
-
-### 场景 2：CI/CD 测试（规则 + LLM）
+### 标准评估（全量 LLM）
 
 ```python
-from eval import EvalPipeline
+from eval import full_eval
 
-pipeline = EvalPipeline()
-result = pipeline.run(ai_output, context="研究方向")
+# 评估 AI 输出
+result = full_eval(ai_output, context="研究方向")
 
-assert result["overall_passed"], f"Eval 失败: {result}"
+if result["overall_passed"]:
+    print("✅ 质量达标")
+else:
+    print("❌ 需要改进:", result["llm_eval"]["suggestions"])
 ```
 
-### 场景 3：理论正确性验证（Vibe Research 专用）
+### 理论正确性验证（Vibe Research 核心）
 
 ```python
 from eval import LLMEvaluator
@@ -90,7 +83,7 @@ else:
     print("推理有问题:", result["suggestions"])
 ```
 
-### 场景 4：批量评估
+### 批量评估
 
 ```python
 from eval import EvalPipeline
