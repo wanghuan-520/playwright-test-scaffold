@@ -1,6 +1,6 @@
 # 多轮 AI 研究助手系统 - 测试计划
 
-> 基于内部需求分析文档生成
+> 基于需求文档生成，详见 [需求文档](../requirements/multi-round-research-agent-requirements.md)
 
 ---
 
