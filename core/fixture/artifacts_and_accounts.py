@@ -201,13 +201,9 @@ def test_account(request):
     logger.info(f"🧹 测试前数据清洗: {test_name}")
     data_manager.cleanup_before_test(test_name)
 
-    # ✅ 智能选择账号类型
-    # 如果是 change_password 相关测试，使用专用账号池（避免并发状态冲突）
-    if "change_password" in test_name.lower() or "change-password" in test_name.lower():
-        account_type = "change_password"
-        logger.info(f"🔐 检测到密码修改测试，使用专用账号池（类型: {account_type}）")
-    else:
-        account_type = "ui_login"
+    # ✅ 统一使用 default 类型账号（简化账号池管理）
+    # change_password 测试会在测试结束时回滚密码，不会污染账号状态
+    account_type = "default"
 
     # 账号可用性预检（避免 UI 登录阶段才发现 invalid/lockout 导致整条用例 setup error）
     backend_url = (config.get_service_url("backend") or "").rstrip("/")

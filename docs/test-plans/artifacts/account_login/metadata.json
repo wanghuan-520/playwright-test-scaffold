@@ -1,0 +1,61 @@
+{
+  "slug": "account_login",
+  "url": "http://localhost:5173/account/login",
+  "title": "Account Login",
+  "page_type": "LOGIN",
+  "auth_required": false,
+  "generated_at": "2026-01-16T10:00:00",
+  "evidence_files": [
+    "visible.txt",
+    "visible.html",
+    "page.png",
+    "metadata.json"
+  ],
+  "element_mapping": [
+    {
+      "type": "input",
+      "name": "Username or Email",
+      "role": "textbox",
+      "locator": "page.get_by_role('textbox', name='Username or Email')"
+    },
+    {
+      "type": "input",
+      "name": "Password",
+      "role": "textbox",
+      "locator": "page.get_by_role('textbox', name='Password')"
+    },
+    {
+      "type": "button",
+      "name": "Login",
+      "role": "button",
+      "locator": "page.get_by_role('button', name='Login')"
+    },
+    {
+      "type": "link",
+      "name": "Register",
+      "role": "link",
+      "locator": "page.get_by_role('link', name='Register')"
+    },
+    {
+      "type": "link",
+      "name": "Forgot Password",
+      "role": "link",
+      "locator": "page.get_by_role('link', name='Forgot Password')"
+    }
+  ],
+  "locator_hints": {
+    "inputs": {
+      "Username or Email": "role=textbox[name=\"Username or Email\"]",
+      "Password": "role=textbox[name=\"Password\"]"
+    },
+    "buttons": {
+      "Login": "role=button[name=\"Login\"]"
+    },
+    "links": {
+      "Register": "role=link[name=\"Register\"]",
+      "Forgot Password": "role=link[name=\"Forgot Password\"]"
+    }
+  },
+  "note": "此文件为占位符。实际使用时需要通过 MCP Playwright 或 PageAnalyzer 动态生成。"
+}
+

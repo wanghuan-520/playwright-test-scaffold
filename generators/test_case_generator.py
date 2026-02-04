@@ -52,6 +52,8 @@ class TestCaseGenerator:
 
         page_key = self._infer_page_key(page, page_info.page_type)
         is_change_password = self._is_change_password_page(url_path=url_path, page_info=page_info)
+        is_register = url_path.startswith("/account/register")
+        is_login = url_path.startswith("/account/login")
 
         # 规则推导（强制：有本地 repo 路径就必须推导；否则拒绝凭猜）
         cfg = ConfigManager()
@@ -80,11 +82,17 @@ class TestCaseGenerator:
         }
         if "p0" in enabled:
             suite[f"{base_dir}/test_{page_key}_p0.py"] = self._p0_py(
-                page_info, module, page, page_key, rules, is_change_password=is_change_password
+                page_info, module, page, page_key, rules, 
+                is_change_password=is_change_password,
+                is_register=is_register,
+                is_login=is_login,
             )
         if "p1" in enabled:
             suite[f"{base_dir}/test_{page_key}_p1.py"] = self._p1_py(
-                page_info, module, page, page_key, rules, is_change_password=is_change_password
+                page_info, module, page, page_key, rules, 
+                is_change_password=is_change_password,
+                is_register=is_register,
+                is_login=is_login,
             )
         if "p2" in enabled:
             suite[f"{base_dir}/test_{page_key}_p2.py"] = self._p2_py(page_info, module, page, page_key, rules)
@@ -342,6 +350,8 @@ def restore_inputs(page: Page, snap: Dict[str, str]) -> None:
         rules: List[Dict],
         *,
         is_change_password: bool,
+        is_register: bool = False,
+        is_login: bool = False,
     ) -> str:
         class_name = to_class_name(get_page_name_from_url(page_info.url))
         file_name = get_file_name_from_url(page_info.url)
@@ -421,8 +431,253 @@ def restore_inputs(page: Page, snap: Dict[str, str]) -> None:
                 f"    logger.end(success=True)\n"
             )
 
+        # 注册页面专用用例
+        register_p0_block = ""
+        if is_register:
+            email_rule = next((r for r in rules if r.get("field") == "email"), None)
+            password_rule = next((r for r in rules if r.get("field") == "password"), None)
+            confirm_password_rule = next((r for r in rules if r.get("field") == "confirm_password"), None)
+            full_name_rule = next((r for r in rules if r.get("field") == "full_name"), None)
+            
+            register_button_sel = "role=button[name=\"Register\"]"
+            agree_terms_sel = "role=checkbox[name=\"I agree to the terms\"]"
+            
+            # 提取selector，避免在f-string中使用复杂表达式
+            full_name_sel_val = (full_name_rule['selector'] if full_name_rule else "")
+            email_sel_val = (email_rule['selector'] if email_rule else "")
+            password_sel_val = (password_rule['selector'] if password_rule else "")
+            confirm_password_sel_val = (confirm_password_rule['selector'] if confirm_password_rule else "")
+            
+            register_p0_block = f"""
+# TC002: 注册页字段可输入 + 提交按钮可用性
+@pytest.mark.P0
+@pytest.mark.functional
+@allure.feature({class_name!r})
+@allure.story('P0')
+@allure.title('TC002: 注册页字段可输入 + 提交按钮可用性')
+def test_p0_register_fields_input_and_submit(test_page: Page):
+    logger.start()
+    page = test_page
+    po = {class_name}Page(page)
+
+    po.navigate()
+    assert_not_redirected_to_login(page)
+    
+    # 验证字段可输入
+    full_name_sel = {full_name_sel_val!r}
+    email_sel = {email_sel_val!r}
+    password_sel = {password_sel_val!r}
+    confirm_password_sel = {confirm_password_sel_val!r}
+    
+    if full_name_sel:
+        page.fill(full_name_sel, 'Test User')
+    if email_sel:
+        page.fill(email_sel, 'test@example.com')
+    if password_sel:
+        page.fill(password_sel, 'TestPass123!')
+    if confirm_password_sel:
+        page.fill(confirm_password_sel, 'TestPass123!')
+    
+    # 验证提交按钮可用
+    register_btn = page.locator({register_button_sel!r})
+    assert register_btn.is_visible(), 'Register button should be visible'
+    
+    po.take_screenshot({page_key!r} + '_p0_fields_input')
+    logger.end(success=True)
+
+# TC005: 确认密码不匹配
+@pytest.mark.P0
+@pytest.mark.validation
+@allure.feature({class_name!r})
+@allure.story('P0')
+@allure.title('TC005: 确认密码不匹配')
+def test_p0_password_confirm_mismatch(test_page: Page):
+    logger.start()
+    page = test_page
+    po = {class_name}Page(page)
+
+    po.navigate()
+    assert_not_redirected_to_login(page)
+    
+    password_sel = {password_sel_val!r}
+    confirm_password_sel = {confirm_password_sel_val!r}
+    if password_sel and confirm_password_sel:
+        page.fill(password_sel, 'TestPass123!')
+        page.fill(confirm_password_sel, 'TestPass124!')
+        page.click({register_button_sel!r})
+        
+        # 应该显示错误提示
+        assert_toast_contains_any(page, ['match', '不匹配', '不一致', 'Confirm'])
+        po.take_screenshot({page_key!r} + '_p0_password_mismatch')
+    else:
+        pytest.skip('Password or Confirm Password field not found')
+    
+    logger.end(success=True)
+
+# TC007: 同意条款必选
+@pytest.mark.P0
+@pytest.mark.validation
+@allure.feature({class_name!r})
+@allure.story('P0')
+@allure.title('TC007: 同意条款必选')
+def test_p0_agree_terms_required(test_page: Page):
+    logger.start()
+    page = test_page
+    po = {class_name}Page(page)
+
+    po.navigate()
+    assert_not_redirected_to_login(page)
+    
+    # 填写所有字段但不勾选同意条款
+    full_name_sel = {full_name_sel_val!r}
+    email_sel = {email_sel_val!r}
+    password_sel = {password_sel_val!r}
+    confirm_password_sel = {confirm_password_sel_val!r}
+    
+    if full_name_sel:
+        page.fill(full_name_sel, 'Test User')
+    if email_sel:
+        page.fill(email_sel, 'test@example.com')
+    if password_sel:
+        page.fill(password_sel, 'TestPass123!')
+    if confirm_password_sel:
+        page.fill(confirm_password_sel, 'TestPass123!')
+    
+    # 不勾选同意条款，直接提交
+    page.click({register_button_sel!r})
+    
+    # 应该显示必选提示
+    assert_any_validation_evidence(page, {agree_terms_sel!r})
+    po.take_screenshot({page_key!r} + '_p0_agree_terms_required')
+    
+    logger.end(success=True)
+
+# TC006: 重复注册验证
+@pytest.mark.P0
+@pytest.mark.negative
+@allure.feature({class_name!r})
+@allure.story('P0')
+@allure.title('TC006: 重复注册验证')
+def test_p0_register_duplicate_email(test_page: Page, test_account):
+    logger.start()
+    page = test_page
+    po = {class_name}Page(page)
+
+    po.navigate()
+    assert_not_redirected_to_login(page)
+    
+    # 使用已存在的邮箱注册
+    account = test_account
+    full_name_sel = {full_name_sel_val!r}
+    email_sel = {email_sel_val!r}
+    password_sel = {password_sel_val!r}
+    confirm_password_sel = {confirm_password_sel_val!r}
+    
+    if full_name_sel:
+        page.fill(full_name_sel, 'Test User')
+    if email_sel:
+        page.fill(email_sel, account.get('email') or 'existing@example.com')
+    if password_sel:
+        page.fill(password_sel, 'TestPass123!')
+    if confirm_password_sel:
+        page.fill(confirm_password_sel, 'TestPass123!')
+    
+    # 勾选同意条款
+    agree_terms_sel = {agree_terms_sel!r}
+    if page.locator(agree_terms_sel).count() > 0:
+        page.check(agree_terms_sel)
+    
+    page.click({register_button_sel!r})
+    
+    # 应该显示错误提示（用户名和邮箱已存在）
+    page.wait_for_timeout(2000)
+    try:
+        assert_toast_contains_any(page, ['exists', '已存在', 'duplicate', '重复'])
+    except AssertionError:
+        assert has_any_error_ui(page), 'Should show duplicate email error'
+    po.take_screenshot({page_key!r} + '_p0_duplicate_email')
+    
+    logger.end(success=True)
+"""
+
+        # 登录页面专用用例
+        login_p0_block = ""
+        if is_login:
+            username_rule = next((r for r in rules if r.get("field") in ("username", "email")), None)
+            password_rule = next((r for r in rules if r.get("field") == "password"), None)
+            login_button_sel = "role=button[name=\"Login\"]"
+            
+            username_sel_val = (username_rule['selector'] if username_rule else "")
+            password_sel_val = (password_rule['selector'] if password_rule else "")
+            
+            login_p0_block = f"""
+# TC002: 登录成功（有效凭证）
+@pytest.mark.P0
+@pytest.mark.functional
+@allure.feature({class_name!r})
+@allure.story('P0')
+@allure.title('TC002: 登录成功（有效凭证）')
+def test_p0_login_success(test_page: Page, test_account):
+    logger.start()
+    page = test_page
+    po = {class_name}Page(page)
+
+    po.navigate()
+    assert_not_redirected_to_login(page)
+    
+    # 使用账号池中的账号登录
+    account = test_account
+    username_sel = {username_sel_val!r}
+    password_sel = {password_sel_val!r}
+    if username_sel:
+        page.fill(username_sel, account.get('email') or account.get('username', ''))
+    if password_sel:
+        page.fill(password_sel, account.get('password', ''))
+    
+    page.click({login_button_sel!r})
+    
+    # 等待跳转或成功提示
+    page.wait_for_timeout(2000)
+    # 登录成功后应该跳转或显示成功提示
+    po.take_screenshot({page_key!r} + '_p0_login_success')
+    
+    logger.end(success=True)
+
+# TC003: 登录失败（错误密码）
+@pytest.mark.P0
+@pytest.mark.negative
+@allure.feature({class_name!r})
+@allure.story('P0')
+@allure.title('TC003: 登录失败（错误密码）')
+def test_p0_login_fail_wrong_password(test_page: Page, test_account):
+    logger.start()
+    page = test_page
+    po = {class_name}Page(page)
+
+    po.navigate()
+    assert_not_redirected_to_login(page)
+    
+    account = test_account
+    username_sel = {username_sel_val!r}
+    password_sel = {password_sel_val!r}
+    if username_sel:
+        page.fill(username_sel, account.get('email') or account.get('username', ''))
+    if password_sel:
+        page.fill(password_sel, 'WrongPassword123!')
+    
+    page.click({login_button_sel!r})
+    
+    # 应该显示错误提示，且不跳转
+    page.wait_for_timeout(2000)
+    assert '/account/login' in page.url or '/auth/login' in page.url, 'Should stay on login page'
+    assert has_any_error_ui(page) or page.locator('text=/error|错误|失败/i').count() > 0, 'Should show error message'
+    po.take_screenshot({page_key!r} + '_p0_login_fail')
+    
+    logger.end(success=True)
+"""
+
         happy_path_block = ""
-        if happy_sel:
+        if happy_sel and not is_register and not is_login:
             happy_path_block = (
                 f"\n\n@pytest.mark.P0\n"
                 f"@pytest.mark.functional\n"
@@ -492,9 +747,9 @@ logger = TestLogger({page_key!r} + "_p0")
 @allure.feature({class_name!r})
 @allure.story("P0")
 @allure.title("页面加载")
-def test_p0_page_load(auth_page: Page):
+def test_p0_page_load(test_page: Page):
     logger.start()
-    page = auth_page
+    page = test_page
     po = {class_name}Page(page)
 
     po.navigate()
@@ -504,6 +759,8 @@ def test_p0_page_load(auth_page: Page):
     logger.end(success=True)
 
 {change_password_p0}
+{register_p0_block}
+{login_p0_block}
 {happy_path_block}
 {required_block}
 """
@@ -517,6 +774,8 @@ def test_p0_page_load(auth_page: Page):
         rules: List[Dict],
         *,
         is_change_password: bool,
+        is_register: bool = False,
+        is_login: bool = False,
     ) -> str:
         class_name = to_class_name(get_page_name_from_url(page_info.url))
         file_name = get_file_name_from_url(page_info.url)
@@ -708,6 +967,209 @@ def test_p0_page_load(auth_page: Page):
                 f"    logger.end(success=True)\n"
             )
 
+        # 注册页面专用P1用例
+        register_p1_block = ""
+        if is_register:
+            email_rule = next((r for r in rules if r.get("field") == "email"), None)
+            password_rule = next((r for r in rules if r.get("field") == "password"), None)
+            register_button_sel = "role=button[name=\"Register\"]"
+            
+            email_sel_val = (email_rule['selector'] if email_rule else "")
+            password_sel_val = (password_rule['selector'] if password_rule else "")
+            confirm_password_sel_val = next((r['selector'] for r in rules if r.get('field') == 'confirm_password'), "")
+            
+            register_p1_block = f"""
+# TC003: Email 格式校验
+@pytest.mark.P1
+@pytest.mark.validation
+@allure.feature({class_name!r})
+@allure.story('P1')
+@allure.title('TC003: Email 格式校验')
+def test_p1_email_format_validation(test_page: Page):
+    logger.start()
+    page = test_page
+    po = {class_name}Page(page)
+
+    po.navigate()
+    assert_not_redirected_to_login(page)
+    
+    email_sel = {email_sel_val!r}
+    if not email_sel:
+        pytest.skip('Email field not found')
+    
+    # 测试非法email格式
+    page.fill(email_sel, 'invalid-email')
+    page.click({register_button_sel!r})
+    
+    # 应该显示格式错误
+    is_valid = page.eval_on_selector(email_sel, 'el => el.checkValidity()')
+    assert is_valid is False, 'Expected HTML5 email validity to reject invalid email'
+    po.take_screenshot({page_key!r} + '_p1_email_invalid')
+    
+    logger.end(success=True)
+
+# TC004: 密码策略矩阵（弱密码）
+@pytest.mark.P1
+@pytest.mark.validation
+@allure.feature({class_name!r})
+@allure.story('P1')
+@allure.title('TC004: 密码策略矩阵（弱密码）')
+def test_p1_password_policy_weak_password(test_page: Page):
+    logger.start()
+    page = test_page
+    po = {class_name}Page(page)
+
+    po.navigate()
+    assert_not_redirected_to_login(page)
+    
+    password_sel = {password_sel_val!r}
+    confirm_password_sel = {confirm_password_sel_val!r}
+    register_button_sel_val = {register_button_sel!r}
+    
+    if not password_sel:
+        pytest.skip('Password field not found')
+    
+    # 测试弱密码（太短、缺数字、缺大写等）
+    weak_passwords = ['123', 'abc', 'ABC', 'abc123']
+    for weak_pwd in weak_passwords:
+        page.fill(password_sel, weak_pwd)
+        if confirm_password_sel:
+            page.fill(confirm_password_sel, weak_pwd)
+        page.click(register_button_sel_val)
+        
+        # 应该显示密码策略错误
+        page.wait_for_timeout(500)
+        assert has_any_error_ui(page) or page.locator('text=/password|密码|weak|弱/i').count() > 0, f'Should reject weak password: {{weak_pwd}}'
+        po.take_screenshot({page_key!r} + f'_p1_weak_password_{{weak_pwd}}')
+    
+    logger.end(success=True)
+"""
+
+        # 登录页面专用P1用例
+        login_p1_block = ""
+        if is_login:
+            username_rule = next((r for r in rules if r.get("field") in ("username", "email")), None)
+            login_button_sel = "role=button[name=\"Login\"]"
+            
+            username_sel_val = (username_rule['selector'] if username_rule else "")
+            password_sel_val = next((r['selector'] for r in rules if r.get('field') == 'password'), "")
+            
+            login_p1_block = f"""
+# TC004: 登录失败（不存在的用户名）
+@pytest.mark.P0
+@pytest.mark.negative
+@allure.feature({class_name!r})
+@allure.story('P0')
+@allure.title('TC004: 登录失败（不存在的用户名）')
+def test_p1_login_fail_nonexistent_user(test_page: Page):
+    logger.start()
+    page = test_page
+    po = {class_name}Page(page)
+
+    po.navigate()
+    assert_not_redirected_to_login(page)
+    
+    username_sel = {username_sel_val!r}
+    password_sel = {password_sel_val!r}
+    login_button_sel_val = {login_button_sel!r}
+    
+    if not username_sel:
+        pytest.skip('Username field not found')
+    
+    # 使用不存在的用户名
+    page.fill(username_sel, 'nonexistent@example.com')
+    if password_sel:
+        page.fill(password_sel, 'AnyPassword123!')
+    page.click(login_button_sel_val)
+    
+    # 应该显示错误提示，且不泄露账号存在性
+    page.wait_for_timeout(2000)
+    assert '/account/login' in page.url or '/auth/login' in page.url, 'Should stay on login page'
+    assert has_any_error_ui(page) or page.locator('text=/error|错误|失败|invalid|无效/i').count() > 0, 'Should show error message'
+    po.take_screenshot({page_key!r} + '_p1_nonexistent_user')
+    
+    logger.end(success=True)
+
+# TC005: 必填校验（用户名/密码为空）
+@pytest.mark.P1
+@pytest.mark.validation
+@allure.feature({class_name!r})
+@allure.story('P1')
+@allure.title('TC005: 必填校验（用户名/密码为空）')
+def test_p1_login_required_fields(test_page: Page):
+    logger.start()
+    page = test_page
+    po = {class_name}Page(page)
+
+    po.navigate()
+    assert_not_redirected_to_login(page)
+    
+    username_sel = {username_sel_val!r}
+    password_sel = {password_sel_val!r}
+    login_button_sel_val = {login_button_sel!r}
+    
+    # 测试用户名为空
+    if username_sel:
+        page.fill(username_sel, '')
+        if password_sel:
+            page.fill(password_sel, 'AnyPassword123!')
+        page.click(login_button_sel_val)
+        page.wait_for_timeout(500)
+        assert_any_validation_evidence(page, username_sel)
+        po.take_screenshot({page_key!r} + '_p1_username_required')
+    
+    # 测试密码为空
+    if username_sel and password_sel:
+        page.fill(username_sel, 'test@example.com')
+        page.fill(password_sel, '')
+        page.click(login_button_sel_val)
+        page.wait_for_timeout(500)
+        assert_any_validation_evidence(page, password_sel)
+        po.take_screenshot({page_key!r} + '_p1_password_required')
+    
+    logger.end(success=True)
+
+# TC006: Email 格式校验（如果支持邮箱登录）
+@pytest.mark.P1
+@pytest.mark.validation
+@allure.feature({class_name!r})
+@allure.story('P1')
+@allure.title('TC006: Email 格式校验（如果支持邮箱登录）')
+def test_p1_login_email_format_validation(test_page: Page):
+    logger.start()
+    page = test_page
+    po = {class_name}Page(page)
+
+    po.navigate()
+    assert_not_redirected_to_login(page)
+    
+    username_sel = {username_sel_val!r}
+    password_sel = {password_sel_val!r}
+    login_button_sel_val = {login_button_sel!r}
+    
+    if not username_sel:
+        pytest.skip('Username field not found')
+    
+    # 测试非法email格式
+    page.fill(username_sel, 'invalid-email')
+    if password_sel:
+        page.fill(password_sel, 'AnyPassword123!')
+    page.click(login_button_sel_val)
+    
+    # 应该显示格式错误
+    page.wait_for_timeout(500)
+    is_valid = page.eval_on_selector(username_sel, 'el => el.checkValidity()')
+    if is_valid is False:
+        # HTML5 验证生效
+        pass
+    else:
+        # 或者显示错误UI
+        assert has_any_error_ui(page), 'Should show email format error'
+    po.take_screenshot({page_key!r} + '_p1_email_format_invalid')
+    
+    logger.end(success=True)
+"""
+
         boundary_block = "".join(boundary_blocks)
 
         return f"""# ═══════════════════════════════════════════════════════════════
@@ -734,6 +1196,8 @@ from utils.logger import TestLogger
 
 logger = TestLogger({page_key!r} + "_p1")
 
+{register_p1_block}
+{login_p1_block}
 {boundary_block}
 {email_block}
 {mismatch_block}

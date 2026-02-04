@@ -1,0 +1,14 @@
+页面标题: Account Login
+页面URL: http://localhost:5173/account/login
+
+核心控件摘要:
+- Username or Email 输入框 (textbox)
+- Password 输入框 (password)
+- Login 按钮 (button)
+- Register 链接 (link)
+- Forgot Password 链接 (link)
+
+是否疑似需要登录态: 否
+
+注意: 此文件为占位符。实际使用时需要通过 MCP Playwright 动态生成。
+

@@ -1,0 +1,9 @@
+{
+  "page_info": {
+    "url": "http://localhost:5173/admin/users",
+    "type": "LIST"
+  },
+  "valid_data": {},
+  "invalid_data": {},
+  "boundary_data": {}
+}

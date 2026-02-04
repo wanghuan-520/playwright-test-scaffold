@@ -1,0 +1,40 @@
+{
+  "page_info": {
+    "url": "http://localhost:5173/account/register",
+    "type": "REGISTER"
+  },
+  "valid_data": {
+    "Full Name": "test_value",
+    "Email": "test_value",
+    "Password": "ValidPass123!",
+    "Confirm Password": "ValidPass123!"
+  },
+  "invalid_data": {
+    "Full Name": "",
+    "Email": "",
+    "Password": "123",
+    "Confirm Password": "123"
+  },
+  "boundary_data": {
+    "Full Name": {
+      "empty": "",
+      "min": "a",
+      "max": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "special": "@#$%^&*()"
+    },
+    "Email": {
+      "empty": "",
+      "min": "a",
+      "max": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "special": "@#$%^&*()"
+    },
+    "Password": {
+      "min": "a",
+      "max": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    "Confirm Password": {
+      "min": "a",
+      "max": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    }
+  }
+}

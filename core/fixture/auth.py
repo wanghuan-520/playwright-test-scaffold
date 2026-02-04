@@ -143,12 +143,27 @@ def ensure_auth_storage_state(browser, auth_storage_state_path: str, xdist_worke
                 except Exception:
                     pass
 
-            p.goto(f"{config.get_service_url('frontend')}/auth/login", wait_until="domcontentloaded", timeout=30000)
-            p.wait_for_selector("#LoginInput_UserNameOrEmailAddress", state="visible", timeout=60000)
-
-            p.fill("#LoginInput_UserNameOrEmailAddress", identifier)
-            p.fill("#LoginInput_Password", password)
-            p.click("button[name='Action'][type='submit']")
+            # 支持两种登录页面风格：ABP 后端风格 和 React 前端风格
+            frontend_url = config.get_service_url('frontend')
+            
+            # 尝试 React 前端登录页 (/login)
+            p.goto(f"{frontend_url}/login", wait_until="domcontentloaded", timeout=30000)
+            
+            # 检测是 React 风格还是 ABP 风格
+            is_react_login = p.locator('input[placeholder="Enter username or email"]').count() > 0
+            
+            if is_react_login:
+                # React 前端风格
+                p.fill('input[placeholder="Enter username or email"]', identifier)
+                p.fill('input[placeholder="Enter your password"]', password)
+                p.click('button:has-text("Sign In")')
+            else:
+                # ABP 后端风格（fallback）
+                p.goto(f"{frontend_url}/auth/login", wait_until="domcontentloaded", timeout=30000)
+                p.wait_for_selector("#LoginInput_UserNameOrEmailAddress", state="visible", timeout=60000)
+                p.fill("#LoginInput_UserNameOrEmailAddress", identifier)
+                p.fill("#LoginInput_Password", password)
+                p.click("button[name='Action'][type='submit']")
 
             def _login_error_reason() -> Optional[str]:
                 try:
@@ -316,8 +331,8 @@ def ensure_auth_storage_state(browser, auth_storage_state_path: str, xdist_worke
 
         while attempts < 20:
             try:
-                # ✅ 使用 "auth" 类型账号（专用于 auth_page + storage_state 链路）
-                acc = data_manager.get_test_account(test_name, account_type="auth")
+                # ✅ 使用默认类型账号（从通用账号池获取）
+                acc = data_manager.get_test_account(test_name, account_type="default")
             except RuntimeError:
                 try:
                     data_manager.cleanup_before_test(test_name)

@@ -128,14 +128,22 @@ class RuleDeriver:
         return rules
 
     def _field_key_from_element(self, e: PageElement) -> str:
-        for cand in [e.name, e.id, (e.attributes or {}).get("name", "")]:
+        # 优先使用 name（从 locator_hints 来的元素，name 就是字段名）
+        for cand in [e.name, e.id, (e.attributes or {}).get("name", ""), e.placeholder]:
             cand = (cand or "").strip()
             if cand:
-                return cand
-        # fallback: try selector like #email
+                # 将 "Full Name" 转换为 "full_name" 作为字段key
+                key = cand.lower().replace(" ", "_").replace("-", "_")
+                return key
+        # fallback: try selector like #email or role=textbox[name="Email"] -> email
         sel = (e.selector or "").strip()
         if sel.startswith("#") and len(sel) > 1:
             return sel[1:]
+        # 尝试从 role=textbox[name="Email"] 提取
+        m = re.search(r'name=["\']([^"\']+)["\']', sel)
+        if m:
+            key = m.group(1).lower().replace(" ", "_").replace("-", "_")
+            return key
         return ""
 
     # ═══════════════════════════════════════════════════════════════

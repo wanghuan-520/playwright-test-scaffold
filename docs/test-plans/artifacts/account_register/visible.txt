@@ -1,0 +1,16 @@
+页面标题: Account Register
+页面URL: http://localhost:5173/account/register
+
+核心控件摘要:
+- Full Name 输入框 (textbox)
+- Email 输入框 (textbox)
+- Password 输入框 (password)
+- Confirm Password 输入框 (password)
+- I agree to the terms 复选框 (checkbox)
+- Register 按钮 (button)
+- Login 链接 (link)
+
+是否疑似需要登录态: 否
+
+注意: 此文件为占位符。实际使用时需要通过 MCP Playwright 动态生成。
+

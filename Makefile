@@ -134,3 +134,45 @@ spec-implement:
 
 spec-refresh-po:
 	@python3 -m generators.refresh_page_objects --plans-dir docs/test-plans --slug "$(SLUG)"
+
+# ============================================================
+# Webapp-Testing 集成（开发模式：自动启动服务器）
+# ============================================================
+
+WEBAPP_TESTING_SCRIPT ?= ~/.claude/skills/webapp-testing/scripts/with_server.py
+FRONTEND_DIR ?=
+BACKEND_DIR ?=
+FRONTEND_PORT ?= 5173
+BACKEND_PORT ?= 3000
+SERVER_TIMEOUT ?= 60
+
+test-dev:  ## 开发模式：自动启动前端服务器并运行测试
+	@if [ -z "$(FRONTEND_DIR)" ]; then \
+		echo "❌ 请设置 FRONTEND_DIR 环境变量"; \
+		echo "   示例: make test-dev FRONTEND_DIR=/path/to/frontend"; \
+		exit 1; \
+	fi
+	@python3 $(WEBAPP_TESTING_SCRIPT) \
+		--server "cd $(FRONTEND_DIR) && npm run dev" --port $(FRONTEND_PORT) \
+		--timeout $(SERVER_TIMEOUT) \
+		-- pytest -q $(TEST_TARGET) $(PYTEST_ARGS) --alluredir=allure-results
+
+test-dev-full:  ## 开发模式：自动启动前端+后端服务器并运行测试
+	@if [ -z "$(FRONTEND_DIR)" ] || [ -z "$(BACKEND_DIR)" ]; then \
+		echo "❌ 请设置 FRONTEND_DIR 和 BACKEND_DIR 环境变量"; \
+		echo "   示例: make test-dev-full FRONTEND_DIR=/path/to/frontend BACKEND_DIR=/path/to/backend"; \
+		exit 1; \
+	fi
+	@python3 $(WEBAPP_TESTING_SCRIPT) \
+		--server "cd $(BACKEND_DIR) && python server.py" --port $(BACKEND_PORT) \
+		--server "cd $(FRONTEND_DIR) && npm run dev" --port $(FRONTEND_PORT) \
+		--timeout $(SERVER_TIMEOUT) \
+		-- pytest -q $(TEST_TARGET) $(PYTEST_ARGS) --alluredir=allure-results
+
+discover:  ## 元素发现：探索页面元素（需要设置 URL 环境变量）
+	@if [ -z "$(URL)" ]; then \
+		echo "❌ 请设置 URL 环境变量"; \
+		echo "   示例: make discover URL=http://localhost:5173"; \
+		exit 1; \
+	fi
+	@python3 scripts/discover_elements.py $(URL) $(if $(HEADLESS),--headless,)

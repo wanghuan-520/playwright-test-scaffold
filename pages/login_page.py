@@ -34,21 +34,21 @@ class LoginPage(BasePage):
     """
 
     # ═══════════════════════════════════════════════════════════════
-    # SELECTORS - 修改为你项目的选择器
+    # SELECTORS - Sisyphus Research Platform
     # ═══════════════════════════════════════════════════════════════
     
-    # 输入框选择器（根据你的项目修改）
-    USERNAME_INPUT = "#username"          # 或 "[name='username']", "[name='email']"
-    PASSWORD_INPUT = "#password"          # 或 "[name='password']", "[type='password']"
+    # 输入框选择器 - 适配 Sisyphus Research Platform
+    USERNAME_INPUT = 'input[placeholder="Enter username or email"]'
+    PASSWORD_INPUT = 'input[placeholder="Enter your password"]'
     
     # 提交按钮选择器
-    SUBMIT_BUTTON = "button[type='submit']"  # 或 "#login-btn", ".login-button"
+    SUBMIT_BUTTON = 'button:has-text("Sign In")'
     
     # 登录成功后的标识元素（用于判断登录是否成功）
-    SUCCESS_INDICATOR = "[data-testid='user-menu']"  # 或 ".user-avatar", "#logout-btn"
+    SUCCESS_INDICATOR = 'button[class*="user"], [aria-label*="user"]'  # 用户菜单按钮
     
     # 错误消息选择器
-    ERROR_MESSAGE = ".error-message"  # 或 "[role='alert']", ".toast-error"
+    ERROR_MESSAGE = "[role='alert'], .toast-error, .text-red-500"
 
     # ═══════════════════════════════════════════════════════════════
     # PAGE CONFIG
@@ -57,8 +57,8 @@ class LoginPage(BasePage):
     # 登录页 URL（相对路径）
     URL = "/login"
     
-    # 页面加载指示器
-    page_loaded_indicator = "#username"  # 修改为你的登录表单标识元素
+    # 页面加载指示器 - 适配 Sisyphus Research Platform
+    page_loaded_indicator = 'input[placeholder="Enter username or email"]'
 
     # ═══════════════════════════════════════════════════════════════
     # NAVIGATION

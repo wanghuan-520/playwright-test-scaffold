@@ -1,0 +1,2 @@
+# Admin Platform Settings Tests
+

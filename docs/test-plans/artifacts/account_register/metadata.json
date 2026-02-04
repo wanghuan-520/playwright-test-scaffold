@@ -1,0 +1,68 @@
+{
+  "slug": "account_register",
+  "url": "http://localhost:5173/account/register",
+  "title": "Account Register",
+  "page_type": "REGISTER",
+  "auth_required": false,
+  "generated_at": "2026-01-16T10:00:00",
+  "evidence_files": [
+    "visible.txt",
+    "visible.html",
+    "page.png",
+    "metadata.json"
+  ],
+  "element_mapping": [
+    {
+      "type": "input",
+      "name": "Full Name",
+      "role": "textbox",
+      "locator": "page.get_by_role('textbox', name='Full Name')"
+    },
+    {
+      "type": "input",
+      "name": "Email",
+      "role": "textbox",
+      "locator": "page.get_by_role('textbox', name='Email')"
+    },
+    {
+      "type": "input",
+      "name": "Password",
+      "role": "textbox",
+      "locator": "page.get_by_role('textbox', name='Password')"
+    },
+    {
+      "type": "input",
+      "name": "Confirm Password",
+      "role": "textbox",
+      "locator": "page.get_by_role('textbox', name='Confirm Password')"
+    },
+    {
+      "type": "checkbox",
+      "name": "I agree to the terms",
+      "role": "checkbox",
+      "locator": "page.get_by_role('checkbox', name='I agree to the terms')"
+    },
+    {
+      "type": "button",
+      "name": "Register",
+      "role": "button",
+      "locator": "page.get_by_role('button', name='Register')"
+    }
+  ],
+  "locator_hints": {
+    "inputs": {
+      "Full Name": "role=textbox[name=\"Full Name\"]",
+      "Email": "role=textbox[name=\"Email\"]",
+      "Password": "role=textbox[name=\"Password\"]",
+      "Confirm Password": "role=textbox[name=\"Confirm Password\"]"
+    },
+    "buttons": {
+      "Register": "role=button[name=\"Register\"]"
+    },
+    "links": {
+      "Login": "role=link[name=\"Login\"]"
+    }
+  },
+  "note": "此文件为占位符。实际使用时需要通过 MCP Playwright 或 PageAnalyzer 动态生成。"
+}
+

@@ -1,0 +1,9 @@
+{
+  "page_info": {
+    "url": "http://localhost:5173/account/login",
+    "type": "LOGIN"
+  },
+  "valid_data": {},
+  "invalid_data": {},
+  "boundary_data": {}
+}

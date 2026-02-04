@@ -1,0 +1,15 @@
+页面标题: Admin Users
+页面URL: http://localhost:5173/admin/users
+
+核心控件摘要:
+- Search 输入框 (textbox)
+- Add User 按钮 (button)
+- Users Table 表格 (table)
+- Edit 按钮 (button)
+- Delete 按钮 (button)
+- Next Page 链接 (link, 如果支持分页)
+
+是否疑似需要登录态: 是（需要管理员权限）
+
+注意: 此文件为占位符。实际使用时需要通过 MCP Playwright 动态生成。需要管理员登录态。
+

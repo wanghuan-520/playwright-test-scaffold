@@ -1,0 +1,58 @@
+{
+  "slug": "admin_users",
+  "url": "http://localhost:5173/admin/users",
+  "title": "Admin Users",
+  "page_type": "LIST",
+  "auth_required": true,
+  "generated_at": "2026-01-16T10:00:00",
+  "evidence_files": [
+    "visible.txt",
+    "visible.html",
+    "page.png",
+    "metadata.json"
+  ],
+  "element_mapping": [
+    {
+      "type": "input",
+      "name": "Search",
+      "role": "textbox",
+      "locator": "page.get_by_role('textbox', name='Search')"
+    },
+    {
+      "type": "button",
+      "name": "Add User",
+      "role": "button",
+      "locator": "page.get_by_role('button', name='Add User')"
+    },
+    {
+      "type": "table",
+      "name": "Users Table",
+      "role": "table",
+      "locator": "page.get_by_role('table')"
+    },
+    {
+      "type": "button",
+      "name": "Edit",
+      "role": "button",
+      "locator": "page.get_by_role('button', name='Edit')"
+    },
+    {
+      "type": "button",
+      "name": "Delete",
+      "role": "button",
+      "locator": "page.get_by_role('button', name='Delete')"
+    }
+  ],
+  "locator_hints": {
+    "inputs": {
+      "Search": "role=textbox[name=\"Search\"]"
+    },
+    "buttons": {
+      "Add User": "role=button[name=\"Add User\"]",
+      "Edit": "role=button[name=\"Edit\"]",
+      "Delete": "role=button[name=\"Delete\"]"
+    }
+  },
+  "note": "此文件为占位符。实际使用时需要通过 MCP Playwright 或 PageAnalyzer 动态生成。需要管理员登录态。"
+}
+
