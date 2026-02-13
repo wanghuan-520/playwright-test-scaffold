@@ -19,7 +19,7 @@ from tests.account.register._helpers import (
     assert_not_redirected_to_login,
     click_save,
 )
-from tests.admin.settings.profile._helpers import attach_rule_source_note, step_shot
+from tests.myaccount._helpers import attach_rule_source_note, step_shot
 from utils.logger import TestLogger
 
 logger = TestLogger("Register_p1_terms")

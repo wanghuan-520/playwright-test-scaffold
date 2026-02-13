@@ -95,26 +95,37 @@ def ensure_admin_storage_state(browser, admin_storage_state_path: str, xdist_wor
             except Exception:
                 pass
             
-            # 验证登录态
+            # 验证登录态（使用页面内 fetch 替代 ctx.request，避免 ECONNREFUSED）
             cfg_json = None
-            for _ in range(20):
+            last_err = None
+            for attempt in range(20):
                 try:
-                    r = ctx.request.get(f"{frontend_url}/api/abp/application-configuration")
-                    if r.status == 200:
-                        cfg_json = r.json()
-                        cu = cfg_json.get("currentUser") or {}
-                        if cu.get("isAuthenticated"):
-                            break
-                except Exception:
-                    pass
+                    result = p.evaluate("""async () => {
+                        try {
+                            const r = await fetch('/api/abp/application-configuration');
+                            if (!r.ok) return { error: 'status_' + r.status };
+                            const data = await r.json();
+                            const cu = data.currentUser || {};
+                            return { isAuthenticated: !!cu.isAuthenticated, roles: cu.roles || [] };
+                        } catch(e) {
+                            return { error: e.message };
+                        }
+                    }""")
+                    if result.get("error"):
+                        last_err = result["error"]
+                    elif result.get("isAuthenticated"):
+                        cfg_json = result
+                        break
+                except Exception as e:
+                    last_err = f"{type(e).__name__}: {e}"
                 p.wait_for_timeout(500)
             
             if not cfg_json:
-                return False, "abp_cfg_unavailable"
+                page_url = p.url if p else "unknown"
+                return False, f"abp_cfg_unavailable(last_err={last_err}, page_url={page_url})"
             
             # 验证 admin 角色
-            current_user = cfg_json.get("currentUser") or {}
-            roles = current_user.get("roles") or []
+            roles = cfg_json.get("roles") or []
             roles_l = {str(x).lower() for x in roles}
             
             if not (roles_l & {"admin", "administrator", "superadmin"}):

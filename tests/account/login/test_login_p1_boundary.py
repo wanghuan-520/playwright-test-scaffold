@@ -21,7 +21,7 @@ from typing import Optional
 from playwright.sync_api import Page
 
 from pages.account_login_page import AccountLoginPage
-from tests.admin.settings.profile._helpers import attach_rule_source_note, step_shot
+from tests.myaccount._helpers import attach_rule_source_note, step_shot
 from tests.account.login._helpers import (
     assert_not_redirected_to_login,
     detect_fatal_error_page,

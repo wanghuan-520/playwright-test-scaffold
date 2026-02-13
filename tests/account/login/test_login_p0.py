@@ -12,7 +12,7 @@ import pytest
 from playwright.sync_api import Page
 
 from pages.account_login_page import AccountLoginPage
-from tests.admin.settings.profile._helpers import attach_rule_source_note, step_shot
+from tests.myaccount._helpers import attach_rule_source_note, step_shot
 from tests.account.login._helpers import (
     assert_not_redirected_to_login,
     get_first_available_account,
@@ -90,9 +90,9 @@ def test_p0_login_success_with_account_pool(unauth_page: Page):
         step_shot(po, "step_after_login", full_page=True)
 
     with allure.step("验证登录结果"):
-    current_url = page.url or ""
+        current_url = page.url or ""
         if "/login" in current_url.lower() or "/account/login" in current_url.lower():
-        assert not has_any_error_ui(page), "登录失败：出现错误UI"
+            assert not has_any_error_ui(page), "登录失败：出现错误UI"
         allure.attach(current_url, name="final_url", attachment_type=allure.attachment_type.TEXT)
 
     logger.end(success=True)

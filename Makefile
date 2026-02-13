@@ -1,4 +1,4 @@
-.PHONY: test test-p0 report serve clean
+.PHONY: test test-p0 test-n report serve clean
 .PHONY: test-mutate test-unit test-cov
 .PHONY: clean-cache clean-all
 .PHONY: lint format check install-hooks
@@ -11,6 +11,7 @@
 PYTEST_ARGS ?=
 TEST_TARGET ?= tests
 SUITE_KEY ?=
+WORKERS ?= 4
 PYTHON ?= python3
 
 # ============================================================
@@ -78,6 +79,18 @@ test-mutate:
 	pytest -q $(TEST_TARGET) -m "mutate" $(PYTEST_ARGS) --alluredir=allure-results; \
 	rc=$$?; \
 	$(PYTHON) -m utils.allure_cache sync --suite-key "$(SUITE_KEY)" --guess-from "$(TEST_TARGET)__mutate" --src allure-results; \
+	end_s=$$(date +%s); \
+	dur_s=$$((end_s - start_s)); \
+	h=$$((dur_s / 3600)); m=$$(((dur_s % 3600) / 60)); s=$$((dur_s % 60)); \
+	if [ $$h -gt 0 ]; then printf "Duration: %d:%02d:%02d\\n" $$h $$m $$s; else printf "Duration: %d:%02d\\n" $$m $$s; fi; \
+	exit $$rc
+
+# 多 worker 并行（pytest-xdist），默认 4 worker，生成 Allure 结果后 report
+test-n:
+	@start_s=$$(date +%s); \
+	pytest -q $(TEST_TARGET) -n $(WORKERS) $(PYTEST_ARGS) --alluredir=allure-results; \
+	rc=$$?; \
+	$(PYTHON) -m utils.allure_cache sync --suite-key "$(SUITE_KEY)" --guess-from "$(TEST_TARGET)__n$(WORKERS)" --src allure-results; \
 	end_s=$$(date +%s); \
 	dur_s=$$((end_s - start_s)); \
 	h=$$((dur_s / 3600)); m=$$(((dur_s % 3600) / 60)); s=$$((dur_s % 60)); \

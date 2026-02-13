@@ -14,7 +14,7 @@ import uuid
 from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError
 
 from pages.account_login_page import AccountLoginPage
-from tests.admin.settings.profile._helpers import attach_rule_source_note, step_shot
+from tests.myaccount._helpers import attach_rule_source_note, step_shot
 from tests.account.login._helpers import (
     assert_not_redirected_to_login,
     detect_fatal_error_page,
@@ -105,7 +105,7 @@ def test_security_xss_payload_no_dialog(unauth_page: Page, case_name: str, paylo
             pass
         try:
             po.navigate()
-                page.wait_for_timeout(200)
+            page.wait_for_timeout(200)
         except Exception:
             pass
         assert_not_redirected_to_login(page)

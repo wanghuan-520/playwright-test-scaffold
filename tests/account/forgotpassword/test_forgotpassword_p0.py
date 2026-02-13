@@ -13,7 +13,7 @@ from tests.account.forgotpassword._helpers import (
     click_submit,
     wait_mutation_response,
 )
-from tests.admin.settings.profile._helpers import step_shot, attach_rule_source_note
+from tests.myaccount._helpers import step_shot, attach_rule_source_note
 from utils.logger import TestLogger
 
 logger = TestLogger("forgotpassword_p0")

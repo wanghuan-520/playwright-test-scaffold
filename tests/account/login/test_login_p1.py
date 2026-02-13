@@ -20,7 +20,7 @@ import uuid
 from playwright.sync_api import Page
 
 from pages.account_login_page import AccountLoginPage
-from tests.admin.settings.profile._helpers import attach_rule_source_note, step_shot
+from tests.myaccount._helpers import attach_rule_source_note, step_shot
 from tests.account.login import _helpers
 from tests.account.login._helpers import (
     assert_not_redirected_to_login,
@@ -67,20 +67,20 @@ def test_p1_login_required_fields_validation(unauth_page: Page, field: str, sele
     """
     logger.start()
     attach_rule_source_note(
-    "docs/requirements/account-login-field-requirements.md: Required fields")
+        "docs/requirements/account-login-field-requirements.md: Required fields")
     page = unauth_page
     po = AccountLoginPage(page)
     case_name = f"required_{field}_empty"
 
     with allure.step("导航到登录页"):
-    po.navigate()
+        po.navigate()
         step_shot(po, "step_navigate", full_page=True)
-    assert_not_redirected_to_login(page)
+        assert_not_redirected_to_login(page)
     
     # 获取实际 selector
     actual_selector = getattr(po, selector_attr, None)
     if not actual_selector or page.locator(actual_selector).count() == 0:
-            pytest.skip(f"{field} input not found")
+        pytest.skip(f"{field} input not found")
     
     with allure.step(f"[{case_name}] 填写其他字段，清空目标字段并提交"):
         # 控制变量：填写其他字段
@@ -93,12 +93,12 @@ def test_p1_login_required_fields_validation(unauth_page: Page, field: str, sele
             page.fill(actual_selector, "")
             step_shot(po, f"step_{case_name}_before_submit", full_page=True)
 
-    po.click_login()
+        po.click_login()
         page.wait_for_timeout(1000)
         step_shot(po, f"step_{case_name}_after_submit", full_page=True)
     
     with allure.step("验证被前端拦截"):
-    current_url = page.url or ""
+        current_url = page.url or ""
         page_text = page.content()
 
         # 检查是否跳转到错误页（产品缺陷）
@@ -245,9 +245,9 @@ def test_p1_login_password_whitespace_not_trimmed(unauth_page: Page):
     password_with_spaces = f"  {password}  "
 
     with allure.step("导航到登录页"):
-    po.navigate()
+        po.navigate()
         step_shot(po, "step_navigate", full_page=True)
-    assert_not_redirected_to_login(page)
+        assert_not_redirected_to_login(page)
     
     with allure.step(f"使用带空格的密码登录"):
         allure.attach(
@@ -262,7 +262,7 @@ def test_p1_login_password_whitespace_not_trimmed(unauth_page: Page):
         po.fill_password(password_with_spaces)
         step_shot(po, "step_filled_with_spaces", full_page=True)
 
-    po.click_login()
+        po.click_login()
         page.wait_for_timeout(2000)
         step_shot(po, "step_after_login", full_page=True)
 
@@ -272,17 +272,17 @@ def test_p1_login_password_whitespace_not_trimmed(unauth_page: Page):
         if "/login" in current_url.lower() or has_any_error_ui(page):
             # 登录失败，说明密码空格被保留（正确行为）
             allure.attach(
-            "✅ 密码空格被正确保留，带空格密码登录失败（预期行为）",
-            name="password_whitespace_result",
-            attachment_type=allure.attachment_type.TEXT,
+                "✅ 密码空格被正确保留，带空格密码登录失败（预期行为）",
+                name="password_whitespace_result",
+                attachment_type=allure.attachment_type.TEXT,
             )
         else:
             # 如果登录成功，说明密码被 trim 了（可能有安全风险）
             allure.attach(
-            "⚠️ 密码空格被 trim 了，带空格密码也能登录成功\n"
-            "这可能是一个安全风险，建议保留密码中的空格",
-            name="password_whitespace_result",
-            attachment_type=allure.attachment_type.TEXT,
+                "⚠️ 密码空格被 trim 了，带空格密码也能登录成功\n"
+                "这可能是一个安全风险，建议保留密码中的空格",
+                name="password_whitespace_result",
+                attachment_type=allure.attachment_type.TEXT,
             )
     
     logger.end(success=True)
@@ -321,9 +321,9 @@ def test_p1_login_username_case_sensitivity(unauth_page: Page):
     username_case_changed = username.upper() if username.islower() else username.swapcase()
 
     with allure.step("导航到登录页"):
-    po.navigate()
+        po.navigate()
         step_shot(po, "step_navigate", full_page=True)
-    assert_not_redirected_to_login(page)
+        assert_not_redirected_to_login(page)
     
     with allure.step(f"使用大小写变化的用户名登录"):
         allure.attach(
@@ -346,15 +346,15 @@ def test_p1_login_username_case_sensitivity(unauth_page: Page):
 
         if "/login" not in current_url.lower():
             allure.attach(
-            "✅ 用户名大小写不敏感，登录成功",
-            name="case_sensitivity_result",
-            attachment_type=allure.attachment_type.TEXT,
+                "✅ 用户名大小写不敏感，登录成功",
+                name="case_sensitivity_result",
+                attachment_type=allure.attachment_type.TEXT,
             )
-    else:
+        else:
             allure.attach(
-            "ℹ️ 用户名大小写敏感，变化后登录失败（记录系统行为）",
-            name="case_sensitivity_result",
-            attachment_type=allure.attachment_type.TEXT,
+                "ℹ️ 用户名大小写敏感，变化后登录失败（记录系统行为）",
+                name="case_sensitivity_result",
+                attachment_type=allure.attachment_type.TEXT,
             )
             # 不强制失败，只记录系统行为
     
@@ -628,9 +628,9 @@ def test_p1_login_multiple_methods(unauth_page: Page, login_method: str, credent
         pytest.skip("Test account missing 'password' field")
 
     with allure.step("导航到登录页"):
-    po.navigate()
+        po.navigate()
         step_shot(po, "step_navigate", full_page=True)
-    assert_not_redirected_to_login(page)
+        assert_not_redirected_to_login(page)
 
     with allure.step(f"使用 {login_method} 登录"):
         allure.attach(

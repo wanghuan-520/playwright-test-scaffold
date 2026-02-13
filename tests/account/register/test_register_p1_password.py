@@ -15,7 +15,7 @@ from typing import Optional
 from playwright.sync_api import Page
 
 from pages.account_register_page import AccountRegisterPage
-from tests.admin.settings.profile._helpers import attach_rule_source_note, step_shot
+from tests.myaccount._helpers import attach_rule_source_note, step_shot
 from tests.account.register import _abp_constraints_helpers as ABP
 from tests.account.register._helpers import (
     assert_not_redirected_to_login,
@@ -207,7 +207,7 @@ def test_p1_register_password_length_boundaries(unauth_page: Page, xdist_worker_
             else:
                 pytest.fail(f"{case_name}: 应被拒绝但似乎被接受了")
         else:
-        if resp is not None:
+            if resp is not None:
                 assert resp.status < 500, f"{case_name}: 5xx"
                 assert resp.status < 400, f"{case_name}: {resp.status}"
             assert not has_any_error_ui(page), f"{case_name}: error UI"

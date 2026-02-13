@@ -17,7 +17,7 @@ from tests.account.forgotpassword._helpers import (
     restore_inputs,
     wait_mutation_response,
 )
-from tests.admin.settings.profile._helpers import step_shot, attach_rule_source_note
+from tests.myaccount._helpers import step_shot, attach_rule_source_note
 from utils.config import ConfigManager
 from utils.logger import TestLogger
 

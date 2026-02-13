@@ -71,14 +71,19 @@ Platform.UserManagement.ManagePermissions - 管理用户权限
 
 ## 2. /admin/roles - 角色管理
 
-### 2.1 后端约束
+### 2.1 后端约束（ABP Identity）
 
-| 属性 | 类型 | 说明 |
-|------|------|------|
-| Name | string | 角色名称（唯一） |
-| IsDefault | bool | 是否为默认角色（新用户自动分配） |
-| IsPublic | bool | 是否公开可见 |
-| IsStatic | bool | 是否为静态角色（不可删除） |
+| 属性 | 类型 | ABP 常量 | 说明 |
+|------|------|----------|------|
+| Name | string | - | 角色名称（唯一，可编辑） |
+| IsDefault | bool | - | 是否为默认角色（新用户自动分配） |
+| IsPublic | bool | - | 是否公开可见（用户可申请加入） |
+| IsStatic | bool | - | 是否为静态角色（不可删除，系统预定义） |
+
+**注意**：
+- 角色名称（Name）可编辑，但必须保持唯一性
+- 静态角色（IsStatic = true）不可删除
+- 项目使用 MongoDB，无显式长度限制
 
 ### 2.2 预定义角色
 
@@ -106,15 +111,229 @@ Platform.UserManagement.ManageRoles - 管理角色
 
 ### 2.4 API 端点
 
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| GET | `/api/identity/roles` | 获取角色列表 |
-| GET | `/api/identity/roles/{id}` | 获取角色详情 |
-| POST | `/api/identity/roles` | 创建角色 |
-| PUT | `/api/identity/roles/{id}` | 更新角色 |
-| DELETE | `/api/identity/roles/{id}` | 删除角色 |
+| 方法 | 端点 | 说明 | 权限 |
+|------|------|------|------|
+| GET | `/api/identity/roles` | 获取角色列表 | ManageRoles |
+| GET | `/api/identity/roles/{id}` | 获取角色详情 | ManageRoles |
+| POST | `/api/identity/roles` | 创建角色 | ManageRoles |
+| PUT | `/api/identity/roles/{id}` | 更新角色 | ManageRoles |
+| DELETE | `/api/identity/roles/{id}` | 删除角色 | ManageRoles |
+| GET | `/api/identity/roles/{id}/permissions` | 获取角色权限 | ManageRoles |
+| PUT | `/api/identity/roles/{id}/permissions` | 更新角色权限 | ManageRoles |
 
-### 2.5 已知问题
+### 2.5 Create Role 对话框
+
+#### 2.5.1 字段定义
+
+| 字段 | 必填 | 类型 | 前端 maxlength | 后端限制 | 默认值 |
+|------|------|------|----------------|----------|--------|
+| Role Name | 是 | text | 无 | 唯一性 | - |
+| Description | 否 | textarea | 无 | 无限制 | - |
+| Default Role | 否 | switch | - | boolean | false |
+| Public Role | 否 | switch | - | boolean | true |
+
+#### 2.5.2 前端验证
+
+| 验证规则 | 实现位置 | 错误消息 |
+|----------|----------|----------|
+| Role Name 必填 | `required` 属性 | 浏览器原生验证 |
+| Role Name 唯一性 | 后端 API 验证 | "Role name '{name}' is already taken." |
+
+#### 2.5.3 后端验证
+
+| 字段 | 验证规则 | 错误消息 |
+|------|----------|----------|
+| Name | 必填 | "Role name is required." |
+| Name | 唯一性 | "Role name '{name}' is already taken." |
+| Name | 不能为空字符串 | "Role name cannot be empty." |
+| Name | 无长度限制 | - |
+| Name | 无格式限制 | - |
+
+**说明**：
+- ABP Identity 默认对 Role Name 无长度和格式限制
+- 项目代码中未设置 `IdentityRoleConsts.MaxNameLength`
+- 项目使用 MongoDB，即使有验证限制也不会在数据库层面强制执行
+- 因此 Role Name 可以接受任意长度和格式的字符串（只要满足必填和唯一性）
+
+#### 2.5.4 API 实现
+
+```typescript
+// 创建角色请求
+POST /api/identity/roles
+Body:
+{
+  "name": "string",        // 必填，唯一
+  "isDefault": boolean,    // 可选，默认 false
+  "isPublic": boolean      // 可选，默认 true
+}
+
+Response: 200 OK
+{
+  "id": "guid",
+  "name": "string",
+  "isDefault": boolean,
+  "isPublic": boolean,
+  "isStatic": boolean
+}
+```
+
+### 2.6 Edit Role 对话框
+
+#### 2.6.1 字段定义
+
+| 字段 | 必填 | 类型 | 前端 maxlength | 后端限制 | 说明 |
+|------|------|------|----------------|----------|------|
+| Role Name | 是 | text | 无 | 唯一性 | 可编辑 |
+| Description | 否 | textarea | 无 | 无限制 | 可修改 |
+| Default Role | 否 | switch | - | boolean | 可修改 |
+| Public Role | 否 | switch | - | boolean | 可修改 |
+
+#### 2.6.2 前端验证
+
+| 验证规则 | 实现位置 | 错误消息 |
+|----------|----------|----------|
+| Role Name 必填 | `required` 属性 | 浏览器原生验证 |
+| Role Name 唯一性 | 后端 API 验证 | "Role name '{name}' is already taken." |
+
+#### 2.6.3 后端验证
+
+| 字段 | 验证规则 | 错误消息 |
+|------|----------|----------|
+| Name | 必填 | "Role name is required." |
+| Name | 唯一性 | "Role name '{name}' is already taken." |
+| Name | 不能为空字符串 | "Role name cannot be empty." |
+| Name | 无长度限制 | - |
+| Name | 无格式限制 | - |
+| IsDefault | boolean | - |
+| IsPublic | boolean | - |
+
+**说明**：
+- ABP Identity 默认对 Role Name 无长度和格式限制
+- 项目代码中未设置 `IdentityRoleConsts.MaxNameLength`
+- 项目使用 MongoDB，即使有验证限制也不会在数据库层面强制执行
+- 因此 Role Name 可以接受任意长度和格式的字符串（只要满足必填和唯一性）
+
+#### 2.6.4 静态角色限制
+
+| 场景 | 限制 | 说明 |
+|------|------|------|
+| IsStatic = true | 不可删除 | 系统预定义角色（member, admin） |
+| IsStatic = true | 不可修改 IsDefault | 保护系统角色配置 |
+| IsStatic = true | 不可修改 IsPublic | 保护系统角色配置 |
+
+#### 2.6.5 API 实现
+
+```typescript
+// 更新角色请求
+PUT /api/identity/roles/{id}
+Body:
+{
+  "name": "string",        // 必填，唯一，可修改
+  "isDefault": boolean,    // 可修改（IsStatic = false 时）
+  "isPublic": boolean     // 可修改（IsStatic = false 时）
+}
+
+Response: 200 OK
+{
+  "id": "guid",
+  "name": "string",
+  "isDefault": boolean,
+  "isPublic": boolean,
+  "isStatic": boolean
+}
+```
+
+### 2.7 Role Permissions 对话框
+
+#### 2.7.1 功能定义
+
+Role Permissions 对话框用于管理角色权限，支持：
+- 查看角色当前拥有的权限
+- 勾选/取消勾选权限
+- 按权限组（Permission Group）分组显示
+- 支持全选/取消全选
+
+#### 2.7.2 权限结构
+
+权限采用层级结构：
+
+```
+Permission:Group
+├── Permission:Group.Permission1
+│   ├── Permission:Group.Permission1.Child1
+│   └── Permission:Group.Permission1.Child2
+└── Permission:Group.Permission2
+```
+
+#### 2.7.3 权限组分类
+
+| 权限组 | 说明 | 示例权限 |
+|--------|------|----------|
+| Identity | ABP Identity 管理 | Identity.Users, Identity.Roles |
+| SettingManagement | 设置管理 | SettingManagement.Emailing, SettingManagement.TimeZone |
+| Sessions | 会话管理 | Sessions.Create, Sessions.Edit |
+| Knowledge | 知识库管理 | Knowledge.Create, Knowledge.Edit |
+| Platform | 平台管理 | Platform.UserManagement |
+| Agents | 代理管理 | Agents.Orchestration.Execute |
+
+#### 2.7.4 前端验证
+
+| 验证规则 | 实现位置 | 说明 |
+|----------|----------|------|
+| 权限选择 | checkbox | 支持多选 |
+| 权限组展开/折叠 | UI 交互 | 按组组织权限 |
+| 全选/取消全选 | UI 交互 | 批量操作 |
+
+#### 2.7.5 后端验证
+
+| 场景 | 验证规则 | 错误消息 |
+|------|----------|----------|
+| 权限不存在 | 验证权限名称 | "Permission '{name}' does not exist." |
+| 静态角色 | 限制权限修改 | "Cannot modify permissions for static role." |
+
+#### 2.7.6 API 实现
+
+```typescript
+// 获取角色权限
+GET /api/identity/roles/{id}/permissions
+Response: 200 OK
+{
+  "permissions": [
+    {
+      "name": "string",
+      "displayName": "string",
+      "parentName": "string",
+      "isGranted": boolean
+    }
+  ]
+}
+
+// 更新角色权限
+PUT /api/identity/roles/{id}/permissions
+Body:
+{
+  "permissions": [
+    {
+      "name": "string",
+      "isGranted": boolean
+    }
+  ]
+}
+
+Response: 200 OK
+```
+
+### 2.8 错误消息
+
+| 场景 | HTTP Status | 错误消息 |
+|------|-------------|----------|
+| 角色名称已存在 | 409 | "Role name '{name}' is already taken." |
+| 角色不存在 | 404 | "Role not found." |
+| 删除静态角色 | 400 | "Cannot delete static role '{name}'." |
+| 修改静态角色属性 | 400 | "Cannot modify static role '{name}'." |
+| 权限不存在 | 400 | "Permission '{name}' does not exist." |
+
+### 2.9 已知问题
 
 | Bug | 描述 | 优先级 |
 |-----|------|--------|
@@ -254,6 +473,9 @@ var adminExtraPermissions = new[] {
 | Bug | 描述 | 优先级 |
 |-----|------|--------|
 | #3 | 权限名称显示中文（身份标识管理、角色管理等），但界面是英文，i18n 不一致 | P2 |
+| #7 | 权限数量过多（42个），包含可能未使用的权限组（Knowledge、Platform、Agents） | P3 |
+| #8 | 自定义权限未翻译：Sessions、Knowledge、Platform、Agents 等权限组显示为 Permission:xxx 格式，缺少本地化资源 | P2 |
+| #9 | 权限混用中英文：ABP Identity 和 SettingManagement 显示为中文，自定义权限显示为英文 key，语言不一致 | P2 |
 
 ---
 

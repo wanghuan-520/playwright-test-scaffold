@@ -13,7 +13,7 @@ import uuid
 from playwright.sync_api import Page
 
 from pages.account_register_page import AccountRegisterPage
-from tests.admin.settings.profile._helpers import attach_rule_source_note, step_shot
+from tests.myaccount._helpers import attach_rule_source_note, step_shot
 from ._known_bugs import BUG_REG_INJECTION_500, bug_xfail
 from tests.account.register._helpers import (
     assert_not_redirected_to_login,

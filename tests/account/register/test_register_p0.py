@@ -14,7 +14,7 @@ import time
 import uuid
 
 from pages.account_register_page import AccountRegisterPage
-from tests.admin.settings.profile._helpers import attach_rule_source_note, step_shot
+from tests.myaccount._helpers import attach_rule_source_note, step_shot
 from tests.account.register._helpers import (
     FIELD_RULES,
     assert_not_redirected_to_login,

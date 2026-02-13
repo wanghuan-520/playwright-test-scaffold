@@ -9,7 +9,7 @@ from playwright.sync_api import Page, expect
 
 from pages.account_forgotpassword_page import AccountForgotpasswordPage
 from tests.account.forgotpassword._helpers import assert_not_redirected_to_login
-from tests.admin.settings.profile._helpers import step_shot
+from tests.myaccount._helpers import step_shot
 from utils.logger import TestLogger
 
 logger = TestLogger("forgotpassword_p2")

@@ -24,7 +24,7 @@ from tests.account.register._helpers import (
     click_save,
     detect_fatal_error_page,
 )
-from tests.admin.settings.profile._helpers import attach_rule_source_note, step_shot
+from tests.myaccount._helpers import attach_rule_source_note, step_shot
 from utils.logger import TestLogger
 
 logger = TestLogger("Register_p1_username")
@@ -513,14 +513,14 @@ def test_p1_register_username_invalid_formats(unauth_page: Page, username_patter
                     attachment_type=allure.attachment_type.TEXT,
                 )
             elif resp is not None and 400 <= resp.status < 500:
-    allure.attach(
+                allure.attach(
                     f"✅ 后端正确拒绝了无效用户名（status={resp.status}）",
                     name=f"{case_name}_backend_rejected",
-        attachment_type=allure.attachment_type.TEXT,
-    )
+                    attachment_type=allure.attachment_type.TEXT,
+                )
             else:
                 # 如果没有明确拒绝，可能是后端允许了这种格式
                 pytest.xfail(f"后端可能允许了无效用户名格式: {username_pattern}")
-    else:
+        else:
             # 如果跳转到其他页面，可能是注册成功了
             pytest.xfail(f"后端可能允许了无效用户名格式: {username_pattern}")
