@@ -38,11 +38,9 @@ jobs:
 
       - name: Run Ruff (lint + format check)
         run: ruff check . --output-format=github
-        continue-on-error: true
 
       - name: Run MyPy (type check)
         run: mypy --ignore-missing-imports core/ utils/
-        continue-on-error: true
 
   # ─────────────────────────────────────────────────────────────────
   # Job 2: 单元测试
@@ -67,8 +65,7 @@ jobs:
 
       - name: Run unit tests
         run: |
-          pytest tests/framework/ -v --cov=core --cov=utils --cov-report=xml
-        continue-on-error: true
+          PRECHECK_SERVICES=0 PRECHECK_HTTP=0 pytest tests/framework/ -v --cov=core --cov=utils --cov-report=xml
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
@@ -104,10 +101,9 @@ jobs:
           cp config/project.yaml.example config/project.yaml
           cp test-data/test_account_pool.json.example test-data/test_account_pool.json
 
-      - name: Run example tests (dry-run)
+      - name: Run Playwright smoke test
         run: |
-          pytest tests/test_example.py -v -m example --collect-only
-        continue-on-error: true
+          PRECHECK_SERVICES=0 PRECHECK_HTTP=0 pytest tests/e2e/test_playwright_smoke.py -v -m smoke --alluredir=allure-results
 
       - name: Upload test artifacts
         uses: actions/upload-artifact@v4

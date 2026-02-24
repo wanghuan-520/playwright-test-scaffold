@@ -1,4 +1,4 @@
-.PHONY: test test-p0 test-n report serve clean
+.PHONY: test test-p0 report serve clean
 .PHONY: test-mutate test-unit test-cov
 .PHONY: clean-cache clean-all
 .PHONY: lint format check install-hooks
@@ -10,7 +10,6 @@
 PYTEST_ARGS ?=
 TEST_TARGET ?= tests
 SUITE_KEY ?=
-WORKERS ?= 4
 PYTHON ?= python3
 
 # ============================================================
@@ -84,18 +83,6 @@ test-mutate:
 	if [ $$h -gt 0 ]; then printf "Duration: %d:%02d:%02d\\n" $$h $$m $$s; else printf "Duration: %d:%02d\\n" $$m $$s; fi; \
 	exit $$rc
 
-# 多 worker 并行（pytest-xdist），默认 4 worker，生成 Allure 结果后 report
-test-n:
-	@start_s=$$(date +%s); \
-	pytest -q $(TEST_TARGET) -n $(WORKERS) $(PYTEST_ARGS) --alluredir=allure-results; \
-	rc=$$?; \
-	$(PYTHON) -m utils.allure_cache sync --suite-key "$(SUITE_KEY)" --guess-from "$(TEST_TARGET)__n$(WORKERS)" --src allure-results; \
-	end_s=$$(date +%s); \
-	dur_s=$$((end_s - start_s)); \
-	h=$$((dur_s / 3600)); m=$$(((dur_s % 3600) / 60)); s=$$((dur_s % 60)); \
-	if [ $$h -gt 0 ]; then printf "Duration: %d:%02d:%02d\\n" $$h $$m $$s; else printf "Duration: %d:%02d\\n" $$m $$s; fi; \
-	exit $$rc
-
 report:
 	$(PYTHON) -m utils.allure_cache report --out allure-report
 
@@ -117,44 +104,3 @@ clean-all:
 	@echo "🧹 清理所有 Allure 相关文件夹（包括临时文件夹）..."
 	rm -rf allure-results* allure-report* screenshots reports .pytest_cache .allure-cache
 	@echo "✅ 全部清理完成！"
-# ============================================================
-# Webapp-Testing 集成（开发模式：自动启动服务器）
-# ============================================================
-
-WEBAPP_TESTING_SCRIPT ?= ~/.claude/skills/webapp-testing/scripts/with_server.py
-FRONTEND_DIR ?=
-BACKEND_DIR ?=
-FRONTEND_PORT ?= 5173
-BACKEND_PORT ?= 3000
-SERVER_TIMEOUT ?= 60
-
-test-dev:  ## 开发模式：自动启动前端服务器并运行测试
-	@if [ -z "$(FRONTEND_DIR)" ]; then \
-		echo "❌ 请设置 FRONTEND_DIR 环境变量"; \
-		echo "   示例: make test-dev FRONTEND_DIR=/path/to/frontend"; \
-		exit 1; \
-	fi
-	@python3 $(WEBAPP_TESTING_SCRIPT) \
-		--server "cd $(FRONTEND_DIR) && npm run dev" --port $(FRONTEND_PORT) \
-		--timeout $(SERVER_TIMEOUT) \
-		-- pytest -q $(TEST_TARGET) $(PYTEST_ARGS) --alluredir=allure-results
-
-test-dev-full:  ## 开发模式：自动启动前端+后端服务器并运行测试
-	@if [ -z "$(FRONTEND_DIR)" ] || [ -z "$(BACKEND_DIR)" ]; then \
-		echo "❌ 请设置 FRONTEND_DIR 和 BACKEND_DIR 环境变量"; \
-		echo "   示例: make test-dev-full FRONTEND_DIR=/path/to/frontend BACKEND_DIR=/path/to/backend"; \
-		exit 1; \
-	fi
-	@python3 $(WEBAPP_TESTING_SCRIPT) \
-		--server "cd $(BACKEND_DIR) && python server.py" --port $(BACKEND_PORT) \
-		--server "cd $(FRONTEND_DIR) && npm run dev" --port $(FRONTEND_PORT) \
-		--timeout $(SERVER_TIMEOUT) \
-		-- pytest -q $(TEST_TARGET) $(PYTEST_ARGS) --alluredir=allure-results
-
-discover:  ## 元素发现：探索页面元素（需要设置 URL 环境变量）
-	@if [ -z "$(URL)" ]; then \
-		echo "❌ 请设置 URL 环境变量"; \
-		echo "   示例: make discover URL=http://localhost:5173"; \
-		exit 1; \
-	fi
-	@python3 scripts/discover_elements.py $(URL) $(if $(HEADLESS),--headless,)

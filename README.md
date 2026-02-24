@@ -170,12 +170,6 @@ make test-unit
 
 # 运行单元测试 + 覆盖率
 make test-cov
-
-# 开发模式：自动启动服务器并运行测试
-make test-dev FRONTEND_DIR=/path/to/frontend
-
-# 元素发现：探索页面元素
-make discover URL=http://localhost:5173
 ```
 
 ---
@@ -395,7 +389,6 @@ docs(readme): 更新文档
 |------|------|
 | [框架讲解](docs/framework_overview.md) | 框架整体说明 |
 | [架构设计](docs/architecture.md) | 架构说明、设计模式 |
-| [Webapp-Testing 集成](docs/webapp-testing-integration.md) | webapp-testing skill 使用指南 |
 
 ---
 

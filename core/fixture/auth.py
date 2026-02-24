@@ -6,9 +6,9 @@
 
 from __future__ import annotations
 
-import os
 import time
 from pathlib import Path
+import os
 from typing import Optional
 
 import pytest
@@ -20,6 +20,7 @@ from core.fixture.shared import (
     data_manager,
     logger,
 )
+from core.fixture.auth_session_login import try_login_with_account
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -118,197 +119,6 @@ def ensure_auth_storage_state(browser, auth_storage_state_path: str, xdist_worke
         except Exception:
             pass
 
-    def _try_login_with(account: dict) -> tuple[bool, str]:
-        identifier = account.get("email") or account.get("username")
-        password = account.get("password")
-        if not identifier or not password:
-            return False, "missing_credentials"
-
-        ctx = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
-        p = ctx.new_page()
-        try:
-            oversize_set_cookie_lines = []
-
-            def _on_response(resp):
-                try:
-                    _collect_set_cookie_oversize(resp.headers, resp.url, resp.status, oversize_set_cookie_lines)
-                except Exception:
-                    pass
-
-            try:
-                ctx.on("response", _on_response)
-            except Exception:
-                try:
-                    p.on("response", _on_response)
-                except Exception:
-                    pass
-
-            # 支持两种登录页面风格：ABP 后端风格 和 React 前端风格
-            frontend_url = config.get_service_url('frontend')
-            
-            # 尝试 React 前端登录页 (/login)
-            p.goto(f"{frontend_url}/login", wait_until="domcontentloaded", timeout=30000)
-            
-            # 检测是 React 风格还是 ABP 风格
-            is_react_login = p.locator('input[placeholder="Enter username or email"]').count() > 0
-            
-            if is_react_login:
-                # React 前端风格
-                p.fill('input[placeholder="Enter username or email"]', identifier)
-                p.fill('input[placeholder="Enter your password"]', password)
-                p.click('button:has-text("Sign In")')
-            else:
-                # ABP 后端风格（fallback）
-                p.goto(f"{frontend_url}/auth/login", wait_until="domcontentloaded", timeout=30000)
-                p.wait_for_selector("#LoginInput_UserNameOrEmailAddress", state="visible", timeout=60000)
-                p.fill("#LoginInput_UserNameOrEmailAddress", identifier)
-                p.fill("#LoginInput_Password", password)
-                p.click("button[name='Action'][type='submit']")
-
-            def _login_error_reason() -> Optional[str]:
-                try:
-                    if p.get_by_text("Invalid username or password", exact=False).is_visible(timeout=300):
-                        return "invalid_credentials"
-                except Exception:
-                    pass
-                try:
-                    if p.get_by_text("locked", exact=False).is_visible(timeout=300):
-                        return "lockout"
-                except Exception:
-                    pass
-                try:
-                    if p.get_by_text("Login failed", exact=False).is_visible(timeout=300):
-                        return "login_failed"
-                except Exception:
-                    pass
-                return None
-
-            try:
-                p.wait_for_timeout(800)
-            except Exception:
-                pass
-            r0 = _login_error_reason()
-            if r0:
-                return False, r0
-
-            frontend_url = config.get_service_url("frontend")
-            if not frontend_url:
-                return False, "missing_frontend_url"
-
-            cfg_json = None
-            for _ in range(24):  # ~12s
-                try:
-                    r = ctx.request.get(f"{frontend_url}/api/abp/application-configuration")
-                    if r.status == 200:
-                        cfg_json = r.json()
-                        cu = (cfg_json.get("currentUser") or {})
-                        if cu.get("isAuthenticated") is True:
-                            break
-                except Exception:
-                    pass
-                try:
-                    p.wait_for_timeout(500)
-                except Exception:
-                    pass
-
-            if not cfg_json:
-                try:
-                    r2 = ctx.request.get(f"{frontend_url}/api/account/my-profile")
-                    return False, f"abp_cfg_unavailable(my_profile={r2.status})"
-                except Exception:
-                    return False, "abp_cfg_unavailable"
-
-            current_user = (cfg_json.get("currentUser") or {})
-            roles = current_user.get("roles") or []
-            roles_l = {str(x).lower() for x in roles}
-
-            profile_path = os.getenv("PERSONAL_SETTINGS_PATH", "/admin/profile")
-            
-            # 个人设置路径白名单：这些 /admin/* 路径不需要 admin 角色
-            # 任何登录用户都可以访问自己的个人资料和修改密码
-            PERSONAL_PATHS = {
-                "/admin/profile",
-                "/admin/profile/change-password",
-            }
-            
-            # 只有非个人路径的 /admin/* 才需要 admin 角色
-            requires_admin = (
-                profile_path.startswith("/admin") 
-                and profile_path not in PERSONAL_PATHS
-            )
-
-            # 默认策略：只要走 /admin/*（排除个人路径），就要求 admin 账号
-            # 如需允许普通账号访问其他 /admin 路径：显式设置 REQUIRE_ADMIN_FOR_ADMIN_PATH=0
-            require_admin_env = os.getenv("REQUIRE_ADMIN_FOR_ADMIN_PATH", "").strip()
-            if require_admin_env:
-                require_admin = require_admin_env in {"1", "true", "True", "yes", "YES"}
-            else:
-                require_admin = requires_admin
-            if require_admin and requires_admin and not (roles_l & {"admin", "administrator", "superadmin"}):
-                return False, f"not_admin(roles={sorted(list(roles_l))})"
-
-            def _verify_session_via_my_profile() -> tuple[bool, str]:
-                """
-                用后端/代理接口验证登录态是否真正生效。
-
-                为什么：
-                - 页面路由可能因产品策略（/admin 权限、首登引导、A/B）发生跳转
-                - 但 storage_state 的本质是 cookies/session 是否可用，最稳定的验证是 my-profile 200
-                """
-                try:
-                    r = ctx.request.get(f"{frontend_url}/api/account/my-profile")
-                    if r.status == 200:
-                        return True, "ok"
-                    return False, f"my_profile_not_ok(status={r.status})"
-                except Exception as e:
-                    return False, f"my_profile_exception({type(e).__name__})"
-
-            # 先做一次接口级验证（避免被页面跳转误判为“未登录”）
-            ok_my, reason_my = _verify_session_via_my_profile()
-            if not ok_my:
-                return False, f"login_state_unstable({reason_my})"
-
-            # 再尝试访问 profile 页面（用于提前发现路由/权限问题），但这里不再作为 storage_state 生成的硬门槛
-            p.goto(f"{frontend_url}{profile_path}", wait_until="domcontentloaded", timeout=60000)
-            try:
-                try:
-                    p.wait_for_timeout(800)
-                except Exception:
-                    pass
-                if profile_path not in (p.url or ""):
-                    # 关键：不要因为“页面跳转策略”直接让 storage_state 生成失败，否则会导致整套登录态用例全部 skip。
-                    # 具体页面可访问性由对应的 UI 用例断言。
-                    logger.warning(f"storage_state: profile page redirected, url={getattr(p, 'url', '')}")
-                p.wait_for_selector("#userName", state="visible", timeout=15000)
-            except Exception:
-                r1 = _login_error_reason()
-                if r1:
-                    return False, r1
-                # profile 页面不可用仍允许生成 storage_state（原因同上）
-                logger.warning(f"storage_state: profile page unavailable, url={getattr(p, 'url', '')}")
-
-            if oversize_set_cookie_lines:
-                logger.warning("检测到可疑的超大 Set-Cookie（可能导致 iron-session 报错/登录态不稳定）：")
-                for line in oversize_set_cookie_lines[-8:]:
-                    logger.warning(line)
-
-            ctx.storage_state(path=str(state_path))
-            return True, "ok"
-        except Exception as e:
-            try:
-                logger.warning(
-                    f"login_attempt_exception: user={account.get('username')} id={identifier} err={type(e).__name__}: {e}",
-                    exc_info=True,
-                )
-            except Exception:
-                pass
-            return False, f"exception:{type(e).__name__}"
-        finally:
-            try:
-                ctx.close()
-            except Exception:
-                pass
-
     if reuse_login:
         test_name = f"__worker_login__{xdist_worker_id}"
         reserved_test_name = test_name
@@ -331,8 +141,8 @@ def ensure_auth_storage_state(browser, auth_storage_state_path: str, xdist_worke
 
         while attempts < 20:
             try:
-                # ✅ 使用默认类型账号（从通用账号池获取）
-                acc = data_manager.get_test_account(test_name, account_type="default")
+                # ✅ 使用 "auth" 类型账号（专用于 auth_page + storage_state 链路）
+                acc = data_manager.get_test_account(test_name, account_type="auth")
             except RuntimeError:
                 try:
                     data_manager.cleanup_before_test(test_name)
@@ -342,7 +152,14 @@ def ensure_auth_storage_state(browser, auth_storage_state_path: str, xdist_worke
                 pytest.skip("账号池无可用账号，无法生成登录态 storage_state")
             last_username = acc.get("username")
 
-            ok, reason = _try_login_with(acc)
+            ok, reason = try_login_with_account(
+                browser=browser,
+                config=config,
+                logger=logger,
+                collect_set_cookie_oversize=_collect_set_cookie_oversize,
+                state_path=state_path,
+                account=acc,
+            )
             last_reason = reason
             reason_counts[reason] = reason_counts.get(reason, 0) + 1
             if ok:
@@ -393,7 +210,14 @@ def ensure_auth_storage_state(browser, auth_storage_state_path: str, xdist_worke
             pytest.skip("账号池为空，无法生成登录态 storage_state")
 
         for acc in pool:
-            ok, reason = _try_login_with(acc)
+            ok, reason = try_login_with_account(
+                browser=browser,
+                config=config,
+                logger=logger,
+                collect_set_cookie_oversize=_collect_set_cookie_oversize,
+                state_path=state_path,
+                account=acc,
+            )
             if ok:
                 logger.info(f"✅ 已生成登录态 storage_state: {state_path}")
                 break
