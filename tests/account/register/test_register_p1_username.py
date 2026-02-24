@@ -328,7 +328,7 @@ def test_p1_register_username_boundary(unauth_page: Page, username_len: int, exp
         username = suffix[:username_len]
     else:
         padding_len = username_len - len(suffix)
-    username = ("u" * padding_len) + suffix
+        username = ("u" * padding_len) + suffix
 
     # 在 Allure 报告中显示实际输入内容
     allure.dynamic.parameter("期望长度", username_len)

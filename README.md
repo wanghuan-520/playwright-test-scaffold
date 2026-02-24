@@ -190,11 +190,6 @@ playwright-test-scaffold/
 │   ├── quality/                # 质量标准
 │   └── data/                   # 数据管理规则
 │
-├── .specify/                   # Spec-Kit 配置
-│   ├── memory/                 # 项目宪法与记忆
-│   ├── templates/              # 规约模板
-│   └── scripts/                # 自动化脚本
-│
 ├── config/
 │   ├── project.yaml            # 项目配置中心
 │   └── project.yaml.example    # 配置模板
@@ -227,8 +222,6 @@ playwright-test-scaffold/
 ├── test-data/                  # 测试数据
 │   ├── example_data.json       # 示例数据
 │   └── test_account_pool.json.example
-│
-├── specs/                      # 规约文件（Spec-Kit）
 │
 ├── docs/                       # 文档
 │
@@ -402,9 +395,7 @@ docs(readme): 更新文档
 |------|------|
 | [框架讲解](docs/framework_overview.md) | 框架整体说明 |
 | [架构设计](docs/architecture.md) | 架构说明、设计模式 |
-| [Spec-Kit 指南](docs/spec-kit-guide.md) | Spec-Driven Development |
 | [Webapp-Testing 集成](docs/webapp-testing-integration.md) | webapp-testing skill 使用指南 |
-| [项目宪法](.specify/memory/constitution.md) | 项目核心原则与标准 |
 
 ---
 

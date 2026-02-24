@@ -215,6 +215,11 @@ def test_p1_user_tab_save_button_state(auth_page: Page):
         navigate_and_wait(page_obj, auth_page)
         _switch_to_user_tab(page_obj, auth_page)
 
+    with allure.step("选择一个用户"):
+        page_obj.select_user("loadtest_user_001")
+        auth_page.wait_for_timeout(1000)
+        step_shot(page_obj, "step_user_selected")
+
     with allure.step("验证初始 Save disabled"):
         assert not page_obj.is_save_button_enabled(), "Save 初始应 disabled"
         step_shot(page_obj, "step_save_disabled")

@@ -5,7 +5,6 @@
 ## 相关文档
 
 - **[QUICKSTART.md](../QUICKSTART.md)** ⚡ - 3 步生成测试
-- **[Spec-Kit 指南](./spec-kit-guide.md)** - AI 驱动的规约→代码工作流
 - **[框架概览](./framework_overview.md)** - pytest + Playwright 运行链路
 
 ## 使用方式
@@ -69,9 +68,7 @@ playwright-test-scaffold/
 ├── docs/                         # 文档
 │   ├── architecture.md           # 本文档
 │   ├── framework_overview.md     # 框架概览
-│   └── spec-kit-guide.md         # Spec-Kit 指南
 │
-├── specs/                        # Spec-Kit 规格目录
 │
 ├── scripts/                      # 工具脚本
 │

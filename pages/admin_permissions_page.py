@@ -200,10 +200,16 @@ class AdminPermissionsPage(BasePage):
     # ═══════════════════════════════════════════════════════════════
 
     def select_user(self, username: str) -> None:
-        """选择指定用户"""
+        """选择指定用户（自动滚动 + 重试）"""
         logger.info(f"选择用户: {username}")
         btn = self.page.get_by_role("button", name=username, exact=True)
-        btn.click()
+        # 如果不可见，尝试搜索后再点击
+        if not btn.is_visible(timeout=3000):
+            logger.info(f"用户 {username} 不可见，尝试搜索")
+            self.search_user(username)
+            self.page.wait_for_timeout(1000)
+            btn = self.page.get_by_role("button", name=username, exact=True)
+        btn.click(timeout=10000)
         self.page.wait_for_timeout(1500)
 
     def _get_user_search_input(self):

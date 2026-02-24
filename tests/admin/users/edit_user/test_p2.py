@@ -65,7 +65,7 @@ def test_p2_edit_user_dialog_elements_visible(auth_page):
         with allure.step("验证 Save 和 Cancel 按钮可见"):
             dialog = auth_page.locator('[role="dialog"]')
             save_btn = dialog.get_by_role("button", name="Save Changes")
-            cancel_btn = dialog.get_by_role("button", name="Cancel")
+            cancel_btn = dialog.get_by_role("button", name="Cancel", exact=True)
             
             assert save_btn.is_visible(timeout=3000), "Save Changes 按钮不可见"
             assert cancel_btn.is_visible(timeout=3000), "Cancel 按钮不可见"
@@ -375,7 +375,7 @@ def test_p2_edit_user_button_states(auth_page):
             )
         
         with allure.step("验证 Cancel 按钮可用"):
-            cancel_button = dialog.get_by_role("button", name="Cancel")
+            cancel_button = dialog.get_by_role("button", name="Cancel", exact=True)
             is_enabled = cancel_button.is_enabled()
             allure.attach(
                 f"Cancel 按钮可用: {is_enabled}",

@@ -21,7 +21,7 @@ git checkout -b feature/your-feature-name
 
 ### 3. 编写代码
 
-遵循项目的代码规范（见 `.specify/memory/constitution.md`）：
+遵循项目的代码规范（见 `README.md` 与 `docs/architecture.md`）：
 
 - 文件不超过 400 行
 - 函数不超过 20 行
