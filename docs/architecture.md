@@ -36,6 +36,7 @@ playwright-test-scaffold/
 │   ├── page_waits.py             # 页面等待策略
 │   ├── fixtures.py               # pytest fixtures
 │   └── fixture/                  # fixtures 实现拆分
+│       └── auth_session_login.py # 登录态 storage_state 构建辅助函数
 │
 ├── generators/                   # 代码生成引擎
 │   ├── page_types.py             # PageElement, PageInfo 数据类
@@ -44,14 +45,30 @@ playwright-test-scaffold/
 │   ├── test_code_generator.py    # 测试代码生成器
 │   ├── page_object_generator.py  # Page Object 生成器
 │   ├── test_case_generator.py    # 测试用例生成器
+│   ├── test_case_generator_naming_mixin.py # 用例生成命名与页面识别规则
+│   ├── test_case_generator_helpers_mixin.py # 用例生成共享 helper 模板
+│   ├── test_case_generator_p0_mixin.py # 用例生成 P0 模板
+│   ├── test_case_generator_p1_mixin.py # 用例生成 P1 模板
+│   ├── test_case_generator_p2_security_mixin.py # 用例生成 P2/安全模板
 │   ├── test_data_generator.py    # 测试数据生成器
 │   ├── test_plan_generator.py    # 测试计划生成器
+│   ├── test_plan_rule_cases.py   # 规则化测试计划用例块生成
+│   ├── test_plan_rule_helpers.py # 规则化测试计划辅助函数（映射/风险/数据）
+│   ├── generate_all_test_plans.py # 全量测试计划生成入口
+│   ├── generate_all_test_plans_runner.py # 全量生成编排与执行
+│   ├── generate_all_test_plans_url.py # 全量生成 URL/crawl 规则
+│   ├── generate_all_test_plans_evidence.py # 全量生成证据链落盘
 │   └── utils.py                  # 公共工具函数
 │
 ├── utils/                        # 工具模块
 │   ├── config.py                 # 配置管理器
 │   ├── logger.py                 # 日志系统
 │   ├── data_manager.py           # 数据管理器
+│   ├── data_manager_account_admin.py # DataManager 账号管理扩展
+│   ├── account_pool_io.py        # 账号池文件 I/O（原子读写）
+│   ├── account_precheck.py       # 账号预检 CLI 入口与兼容导出
+│   ├── account_precheck_runner.py # 账号预检编排（结果汇总/回写策略）
+│   ├── account_precheck_http.py  # 账号预检 HTTP/登录细节
 │   └── service_checker.py        # 服务健康检查
 │
 ├── pages/                        # Page Object 实现层
@@ -59,6 +76,8 @@ playwright-test-scaffold/
 │   └── login_page.py             # 登录页对象模板
 │
 ├── tests/                        # 测试用例层
+│   ├── e2e/
+│   │   └── test_playwright_smoke.py  # Playwright 运行时烟测（CI 无业务依赖）
 │   └── test_example.py           # 示例测试
 │
 ├── test-data/                    # 测试数据
@@ -153,6 +172,12 @@ class BasePage(ABC, PageActions, PageWaits):
 
 | 日期 | 变更 |
 |------|------|
+| 2026-02-24 | **可维护性重构**: 拆分 `generators/test_case_generator.py` 为协调器与 P0/P1/P2+Security/Helper/命名 mixin 模块 |
+| 2026-02-24 | **可维护性重构**: 拆分 `generators/generate_all_test_plans.py` 为入口、编排、URL 规则、证据链落盘四个模块 |
+| 2026-02-24 | **可维护性重构**: 拆分 `generators/test_plan_generator.py`，提取规则化用例块与辅助函数到独立模块 |
+| 2026-02-24 | **可维护性重构**: 拆分 `utils/account_precheck.py` 为 CLI 入口、预检编排、HTTP 登录细节三个模块 |
+| 2026-02-24 | **可维护性重构**: 拆分 `auth.py` 与 `data_manager.py`，提取登录态构建与账号池 I/O/账号管理扩展 |
+| 2026-02-24 | **CI 门禁加强**: 取消关键步骤放行失败，新增 `tests/e2e/test_playwright_smoke.py` 真实浏览器烟测 |
 | 2026-01-08 | **框架提纯**: 删除业务代码，变成通用测试框架 |
 | 2026-01-05 | **测试报告优化**: 统一测试报告文件夹结构 |
 | 2025-12-16 | **重大重构**: 拆分超大文件，所有文件控制在 400 行以内 |
