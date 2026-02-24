@@ -134,11 +134,6 @@ make serve
 ## 📁 生成的文件
 
 ```
-specs/<feature>/
-├── spec.md          # 功能规约
-├── plan.md          # 技术计划
-└── tasks.md         # 任务清单
-
 pages/
 └── xxx_page.py      # 页面对象
 
@@ -175,7 +170,6 @@ test-data/
 
 - [框架概览](docs/framework_overview.md)
 - [架构文档](docs/architecture.md)
-- [Spec-Kit 指南](docs/spec-kit-guide.md)
 
 ---
 
