@@ -58,7 +58,9 @@ class DataManager(DataManagerAccountAdmin):
         - 这里用 fcntl.flock 在 macOS/Linux 下提供互斥
         """
         lock_path = f"{self.account_pool_path}.lock"
-        os.makedirs(os.path.dirname(lock_path), exist_ok=True)
+        lock_dir = os.path.dirname(lock_path)
+        if lock_dir:
+            os.makedirs(lock_dir, exist_ok=True)
         with open(lock_path, "w", encoding="utf-8") as lf:
             fcntl.flock(lf, fcntl.LOCK_EX)
             try:

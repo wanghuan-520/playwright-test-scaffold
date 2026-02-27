@@ -51,7 +51,9 @@ def save_account_pool(account_pool_path: str, data: Dict[str, Any], logger) -> N
             logger.warning(f"创建备份失败: {e}")
 
     try:
-        os.makedirs(os.path.dirname(account_pool_path), exist_ok=True)
+        parent_dir = os.path.dirname(account_pool_path)
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
         import time
 
         temp_file = f"{account_pool_path}.tmp.{os.getpid()}.{int(time.time() * 1000000)}"
@@ -70,8 +72,13 @@ def save_account_pool(account_pool_path: str, data: Dict[str, Any], logger) -> N
     except Exception as e:
         logger.error(f"保存账号池失败: {e}")
         try:
-            for p in Path(os.path.dirname(account_pool_path)).glob(f"{Path(account_pool_path).name}.tmp.*"):
-                p.unlink(missing_ok=True)
+            parent_dir = os.path.dirname(account_pool_path)
+            if parent_dir:
+                for p in Path(parent_dir).glob(f"{Path(account_pool_path).name}.tmp.*"):
+                    p.unlink(missing_ok=True)
+            else:
+                for p in Path(".").glob(f"{Path(account_pool_path).name}.tmp.*"):
+                    p.unlink(missing_ok=True)
         except Exception:
             pass
         raise

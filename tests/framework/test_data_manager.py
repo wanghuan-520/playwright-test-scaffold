@@ -150,3 +150,26 @@ class TestAccountAllocation:
         
         assert hasattr(dm, '_test_accounts')
         assert isinstance(dm._test_accounts, dict)
+
+
+class TestDataManagerFileLock:
+    """DataManager 文件锁测试"""
+
+    @pytest.fixture(autouse=True)
+    def reset_singleton(self):
+        """每个测试前重置单例"""
+        from utils.data_manager import DataManager
+        DataManager._instance = None
+        yield
+        DataManager._instance = None
+
+    def test_process_file_lock_supports_root_level_file(self, tmp_path, monkeypatch):
+        """账号池路径为根目录文件名时，锁文件也应可创建。"""
+        from utils.data_manager import DataManager
+
+        monkeypatch.chdir(tmp_path)
+        dm = DataManager()
+        dm.account_pool_path = "root_pool.json"
+
+        with dm._process_file_lock():
+            assert Path("root_pool.json.lock").exists()
